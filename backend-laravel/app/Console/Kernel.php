@@ -13,6 +13,7 @@ class Kernel extends ConsoleKernel
     protected function schedule(Schedule $schedule): void
     {
         // $schedule->command('inspire')->hourly();
+        $schedule->command('chatbot:update')->dailyAt('02:00'); // Jalankan setiap hari jam 2 pagi
     }
 
     /**

@@ -6,14 +6,20 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
+// Hapus 'use App\Models...' karena tidak dipakai lagi
 
 class ChatbotController extends Controller
 {
+    /**
+     * Menangani permintaan chat dan meneruskannya ke API Python.
+     * Versi ini stateless (tidak menyimpan riwayat).
+     */
     public function handleChat(Request $request)
     {
         // Validasi input dari Next.js
         $validator = Validator::make($request->all(), [
             'query' => 'required|string|max:1000',
+            // 'conversation_id' tidak diperlukan lagi
         ]);
 
         if ($validator->fails()) {
@@ -24,52 +30,38 @@ class ChatbotController extends Controller
 
         // Ambil URL API Python dari file .env
         $pythonApiUrl = env('PYTHON_API_URL');
-
         if (!$pythonApiUrl) {
             Log::error('PYTHON_API_URL tidak ditemukan di file .env');
-            return response()->json([
-                'error' => 'Konfigurasi server backend belum lengkap.'
-            ], 500);
+            return response()->json(['error' => 'Konfigurasi server backend belum lengkap.'], 500);
         }
 
         try {
-            // Kirim request ke API Python (Flask) dengan timeout 60 detik
-            $response = Http::timeout(60)->post($pythonApiUrl, [
+            // Kirim request ke API Python (Flask)
+            // Tambahkan timeout lebih lama untuk proses agent yang kompleks
+            $response = Http::timeout(120)->post($pythonApiUrl, [
                 'query' => $userQuery
             ]);
 
-            // Jika API Python mengembalikan error
             if (!$response->successful()) {
-                Log::error('Gagal memanggil API Python', [
-                    'status' => $response->status(),
-                    'body' => $response->body()
-                ]);
-                return response()->json([
-                    'error' => 'Layanan AI sedang tidak merespons.',
-                    'details' => $response->body()
-                ], 502); // 502 Bad Gateway
+                Log::error('Gagal memanggil API Python', ['status' => $response->status(), 'body' => $response->body()]);
+                return response()->json(['error' => 'Layanan AI sedang tidak merespons.'], 502);
             }
 
-            // Ambil hasil dari Python API
+            // Ambil data JSON LENGKAP dari Python
             $data = $response->json();
 
-            // Kembalikan respons ke frontend Next.js
-            return response()->json([
-                'reply' => $data['reply'] ?? 'Tidak ada balasan dari layanan AI.'
-            ]);
+            // Kembalikan respons LENGKAP dari Python ke frontend
+            // Ini akan mencakup 'reply' dan 'newQuickReplies'
+            return response()->json($data);
 
         } catch (\Illuminate\Http\Client\ConnectionException $e) {
             Log::error('Koneksi ke API Python gagal', ['message' => $e->getMessage()]);
-            return response()->json([
-                'error' => 'Tidak dapat terhubung ke layanan AI. Pastikan server Python berjalan.',
-                'details' => $e->getMessage(),
-            ], 504); // 504 Gateway Timeout
+            return response()->json(['error' => 'Tidak dapat terhubung ke layanan AI.'], 504);
         } catch (\Exception $e) {
-            Log::error('Terjadi kesalahan umum saat menghubungi API Python', ['message' => $e->getMessage()]);
-            return response()->json([
-                'error' => 'Terjadi kesalahan internal pada server.',
-                'details' => $e->getMessage(),
-            ], 500);
+            Log::error('Kesalahan handleChat', ['message' => $e->getMessage()]);
+            return response()->json(['error' => 'Terjadi kesalahan internal pada server.'], 500);
         }
     }
+
+    // Fungsi getHistory() dan getConversationMessages() telah dihapus.
 }

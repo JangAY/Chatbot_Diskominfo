@@ -1,62 +1,11 @@
 // components/Sidebar.js
-import { format } from 'date-fns/format';
-import { id } from 'date-fns/locale/id'; // Untuk format tanggal dalam Bahasa Indonesia
 
-export default function Sidebar({ history, onSelectConversation, onFilterChange, onNewChat, loading }) {
-  // Fungsi helper untuk mengelompokkan riwayat berdasarkan waktu
-  const getGroupedHistory = (historyData) => {
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(today.getDate() - 1);
+// --- PERUBAHAN: Hapus semua import 'date-fns' ---
 
-    const groups = {
-      today: [],
-      yesterday: [],
-      last_week: [],
-      last_month: [],
-      earlier: [],
-    };
-
-    historyData.forEach(conv => {
-      const convDate = new Date(conv.updated_at);
-      if (convDate.toDateString() === today.toDateString()) {
-        groups.today.push(conv);
-      } else if (convDate.toDateString() === yesterday.toDateString()) {
-        groups.yesterday.push(conv);
-      } else if (convDate > new Date(today.setDate(today.getDate() - 7))) {
-        groups.last_week.push(conv);
-      } else if (convDate > new Date(today.setMonth(today.getMonth() - 1))) {
-        groups.last_month.push(conv);
-      } else {
-        groups.earlier.push(conv);
-      }
-    });
-
-    return groups;
-  };
-
-  const groupedHistory = getGroupedHistory(history);
-
-  const renderHistoryGroup = (title, conversations) => {
-    if (conversations.length === 0) return null;
-    return (
-      <div className="mb-4">
-        <h3 className="text-xs uppercase text-gray-400 font-semibold mb-2 ml-2">{title}</h3>
-        <ul>
-          {conversations.map((conv) => (
-            <li
-              key={conv.id}
-              onClick={() => onSelectConversation(conv.id)}
-              className="cursor-pointer p-2 rounded-lg hover:bg-gray-700 transition-colors duration-200 truncate"
-              title={conv.title}
-            >
-              {conv.title || `Percakapan #${conv.id}`}
-            </li>
-          ))}
-        </ul>
-      </div>
-    );
-  };
+// --- PERUBAHAN: Hapus prop 'history', 'loading', dll. ---
+export default function Sidebar({ onNewChat }) {
+  
+  // --- HAPUS: Semua fungsi 'getGroupedHistory' dan 'renderHistoryGroup' ---
 
   return (
     <div className="w-1/4 bg-gray-900 text-white flex flex-col h-full shadow-lg">
@@ -73,20 +22,11 @@ export default function Sidebar({ history, onSelectConversation, onFilterChange,
         </button>
       </div>
 
-      {/* Daftar Riwayat Percakapan */}
+      {/* --- PERUBAHAN: Hapus Daftar Riwayat --- */}
       <div className="flex-1 p-4 overflow-y-auto custom-scrollbar">
-        {loading ? (
-          <span className="loading loading-spinner loading-md text-primary"></span>
-        ) : (
-          <>
-            {renderHistoryGroup('Hari Ini', groupedHistory.today)}
-            {renderHistoryGroup('Kemarin', groupedHistory.yesterday)}
-            {renderHistoryGroup('Minggu Lalu', groupedHistory.last_week)}
-            {renderHistoryGroup('Bulan Lalu', groupedHistory.last_month)}
-            {renderHistoryGroup('Sebelumnya', groupedHistory.earlier)}
-            {history.length === 0 && <p className="text-gray-400 text-sm text-center">Belum ada percakapan.</p>}
-          </>
-        )}
+         <p className="text-gray-400 text-sm text-center">
+            Riwayat chat tidak disimpan dalam sesi ini.
+         </p>
       </div>
 
       {/* Tombol Download Text */}

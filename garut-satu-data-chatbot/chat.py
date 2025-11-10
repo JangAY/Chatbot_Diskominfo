@@ -46,7 +46,7 @@ CORS(app, resources={r"/api/*": {"origins": "http://localhost:8000"}})
 
 print("Flask: Memuat model embedding...")
 generation_model = genai.GenerativeModel(
-    model_name='gemini-1.5-flash',
+    model_name='gemini-2.5-flash',
     safety_settings=safety_settings
 )
 embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
@@ -97,15 +97,22 @@ def correct_query_with_llm(user_query: str) -> str:
         return user_query
 
 def classify_intent(processed_query: str, raw_query: str) -> str:
-    # (Fungsi ini tidak berubah)
     raw_lower = raw_query.lower().strip()
+    
     if raw_lower == "apa saja dataset yang tersedia?":
         return "list_sectors"
+    
+    # --- PERBAIKAN: Deteksi pencarian sektor ---
+    if raw_lower.startswith("tampilkan dataset sektor"):
+        return "dataset_sector_search"
+
     general_keywords = [
         "siapa kamu", "apa itu", "bagaimana cara", "jelaskan", "apa yang dimaksud"
     ]
     if any(raw_lower.startswith(key) for key in general_keywords):
         return "general_question"
+    
+    # Jika bukan di atas, baru jalankan agen data
     return "run_data_agent"
 
 def handle_general_question(query: str) -> dict:
@@ -302,11 +309,9 @@ def handle_dataset_search(sub_query: str) -> dict:
         return {"status": "error", "query": sub_query, "error_message": "Error: Database dataset tidak dapat diakses."}
         
     try:
-        # --- PERBAIKAN LOGIKA PENCARIAN ---
-        # 1. JANGAN hapus tahun. Gunakan sub-query LENGKAP untuk pencarian.
-        #    Ini membuat pencarian jauh lebih spesifik.
-        # topic_query = re.sub(r'\b(20\d{2})\b', '', sub_query).strip() # <-- HAPUS BARIS INI
-        topic_query = sub_query # <-- GUNAKAN INI
+        # --- PERBAIKAN LOGIKA PENCARIAN (Bug "Padi") ---
+        # 1. Gunakan sub-query LENGKAP untuk pencarian semantik.
+        topic_query = sub_query
         
         print(f"[1] Membuat embedding untuk query LENGKAP: '{topic_query}'...")
         embedding_list = embedding_model.encode([topic_query]).tolist()
@@ -335,12 +340,7 @@ def handle_dataset_search(sub_query: str) -> dict:
         if not candidate_datasets:
             return {"status": "error", "query": sub_query, "error_message": f"Maaf, saya tidak dapat menemukan dataset yang cukup relevan untuk '{sub_query}'."}
         
-        # --- PERBAIKAN LOGIKA FILTER ---
-        # 3. HAPUS filter tahun.
-        #    Embedding model sudah menangani pencocokan tahun.
-        #    Filter ini yang menyebabkan bug (memilih data Padi).
-        
-        # Cukup ambil hasil teratas (paling relevan)
+        # 3. Ambil hasil teratas (paling relevan).
         final_dataset = candidate_datasets[0] 
         print(f"Mengambil hasil teratas yang relevan: {final_dataset[0].get('title')}")
         # --- AKHIR PERBAIKAN LOGIKA FILTER ---
@@ -480,8 +480,7 @@ def handle_chat():
             # Langkah 4e: Gabungkan Semua
             combined_reply = final_summary 
             if data_blocks:
-                # --- PERBAIKAN TYPO DI SINI ---
-                # Mengganti 'class ' (spasi) dengan 'class=' (=)
+                # --- PERBAIKAN TYPO HTML ---
                 combined_reply += "\n\n<hr class='my-4 border-gray-300'>\n\n" + "\n\n<hr class='my-4 border-gray-300'>\n\n".join(data_blocks)
             if failed_messages:
                 combined_reply += "\n\n" + "\n".join(failed_messages)

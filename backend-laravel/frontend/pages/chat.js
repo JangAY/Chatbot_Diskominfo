@@ -1,59 +1,89 @@
-// pages/chat.js (atau di mana pun Anda ingin menampilkan chat)
+'use client';
 
-import { useState } from 'react';
-import ChatWindow from '../components/ChatWindow'; // Sesuaikan path jika perlu
+import { useState } from 'react'; // Hapus useEffect
+import Sidebar from '@/components/Sidebar';
+import ChatWindow from '@/components/ChatWindow';
 
-export default function ChatPage() {
-    // State untuk menyimpan seluruh percakapan
+const LARAVEL_API_URL = 'http://localhost:8000/api';
+
+const DEFAULT_QUICK_REPLIES = [
+    { label: "Apa saja dataset yang tersedia?", value: "Apa saja dataset yang tersedia?" },
+    { label: "Tampilkan jumlah penduduk Garut.", value: "Tampilkan jumlah penduduk Garut 2022" },
+    { label: "Bagaimana cara menggunakan portal ini?", value: "Bagaimana cara menggunakan portal ini?" },
+    { label: "Jelaskan metadata yang ada.", value: "Jelaskan metadata yang ada." }
+];
+
+export default function Home() {
+    // --- PERUBAHAN: State Jauh Lebih Sederhana ---
+    // 'conversation' hanya menyimpan pesan di sesi INI.
     const [conversation, setConversation] = useState(null); 
-    // State untuk loading indicator
-    const [loading, setLoading] = useState(false);
+    const [loadingReply, setLoadingReply] = useState(false);
+    const [quickReplies, setQuickReplies] = useState(DEFAULT_QUICK_REPLIES);
 
-    // Fungsi ini dipanggil saat pengguna mengirim pesan
+    // --- HAPUS: fetchHistory() dan useEffect() ---
+    // ...
+
+    // --- HAPUS: handleSelectConversation() ---
+    // ...
+
     const handleSendMessage = async (messageText) => {
-        // Jangan kirim pesan baru jika sedang loading
-        if (loading) return;
+        if (loadingReply) return;
+
+        setLoadingReply(true);
+        setQuickReplies([]); 
 
         const userMessage = {
-            id: Date.now(), // Unique key
+            id: `user-${Date.now()}`,
             sender: 'user',
             content: messageText,
         };
 
-        // Langsung tampilkan pesan pengguna di UI
-        setConversation(prev => {
-            if (!prev) { // Jika ini pesan pertama
-                return { id: 'conv-1', messages: [userMessage] };
-            }
-            return { ...prev, messages: [...prev.messages, userMessage] };
-        });
-
-        setLoading(true);
+        // Langsung tambahkan pesan user ke state
+        if (!conversation) {
+            setConversation({ id: 'session-1', messages: [userMessage] }); // ID Sesi (bisa apa saja)
+        } else {
+            setConversation(prev => ({
+                ...prev,
+                messages: [...prev.messages, userMessage],
+            }));
+        }
 
         try {
-            // Panggil API backend Laravel Anda
-            const response = await fetch('http://localhost:8000/api/chat', { // <-- SESUAIKAN URL BACKEND ANDA
+            const response = await fetch(`${LARAVEL_API_URL}/chat`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Accept': 'application/json',
                 },
-                body: JSON.stringify({ query: messageText }),
+                body: JSON.stringify({ 
+                    query: messageText,
+                    // conversation_id tidak dikirim lagi
+                }),
             });
 
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                const errorText = await response.text();
+                console.error("Gagal mengirim pesan. Status:", response.status, "Respons Server:", errorText);
+                throw new Error(`Gagal mengirim pesan (Status: ${response.status})`);
             }
 
-            const data = await response.json();
+            const data = await response.json(); 
 
             const botMessage = {
-                id: Date.now() + 1,
+                id: `bot-${Date.now()}`,
                 sender: 'bot',
-                content: data.reply || "Maaf, terjadi kesalahan pada server.",
+                content: data.reply,
             };
 
-            // Tambahkan jawaban dari bot ke UI
+            // Cek tombol dinamis
+            if (data.newQuickReplies && data.newQuickReplies.length > 0) {
+                setQuickReplies(data.newQuickReplies);
+            } else {
+                setQuickReplies(DEFAULT_QUICK_REPLIES);
+            }
+            
+            // --- PERUBAHAN: Logika riwayat dihapus ---
+            // Cukup tambahkan pesan bot ke state sesi saat ini
             setConversation(prev => ({
                 ...prev,
                 messages: [...prev.messages, botMessage],
@@ -62,38 +92,47 @@ export default function ChatPage() {
         } catch (error) {
             console.error("Gagal mengambil respons chatbot:", error);
             const errorMessage = {
-                id: Date.now() + 1,
+                id: `error-${Date.now()}`,
                 sender: 'bot',
-                content: "Maaf, saya sedang mengalami gangguan. Silakan coba lagi nanti.",
+                content: `Maaf, terjadi kesalahan koneksi ke server. (${error.message})`,
             };
-            // Tampilkan pesan error di UI
             setConversation(prev => ({
                 ...prev,
                 messages: [...prev.messages, errorMessage],
             }));
+            setQuickReplies(DEFAULT_QUICK_REPLIES); 
         } finally {
-            // Hentikan loading
-            setLoading(false);
+            setLoadingReply(false);
         }
     };
 
-    // Fungsi untuk menangani klik pada tombol respons cepat
-    const handleQuickResponse = (text) => {
-        // Cukup panggil handleSendMessage dengan teks dari tombol
-        handleSendMessage(text);
+    const handleNewChat = () => {
+        // Cukup bersihkan state sesi saat ini
+        setConversation(null);
+        setQuickReplies(DEFAULT_QUICK_REPLIES); 
+    };
+    
+    const handleQuickResponse = (value) => {
+        handleSendMessage(value);
     };
 
     return (
-        <div className="flex h-screen">
-            {/* Sidebar bisa ditambahkan di sini jika perlu */}
-            {/* <Sidebar /> */}
-            
+        <main className="flex h-screen bg-gray-100 font-inter">
+            <Sidebar
+                // --- PERUBAHAN: Hapus prop yang tidak perlu ---
+                // history={history}
+                onNewChat={handleNewChat}
+                // onSelectConversation={handleSelectConversation}
+                // loading={loadingHistory}
+                // currentConversationId={currentConversationId}
+            />
             <ChatWindow
                 conversation={conversation}
                 onSendMessage={handleSendMessage}
-                loading={loading}
+                loading={loadingReply} // Hanya loading balasan
                 onQuickResponse={handleQuickResponse}
+                quickReplies={quickReplies}
             />
-        </div>
+        </main>
     );
 }

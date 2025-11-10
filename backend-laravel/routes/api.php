@@ -2,22 +2,19 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\ChatbotController;
+use App\Http\Controllers\ChatbotController; // Pastikan ini di-import
 
 /*
 |--------------------------------------------------------------------------
 | API Routes
 |--------------------------------------------------------------------------
-|
-| Here is where you can register API routes for your application. These
-| routes are loaded by the RouteServiceProvider and all of them will
-| be assigned to the "api" middleware group. Make something great!
-|
 */
 
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
 });
 
-// Route untuk menangani permintaan chat dari frontend
+// Endpoint utama untuk mengirim pesan (Hanya ini yang kita butuhkan)
 Route::post('/chat', [ChatbotController::class, 'handleChat']);
+
+// Rute riwayat ('/chat/history' dan '/chat/{id}') telah dihapus.
