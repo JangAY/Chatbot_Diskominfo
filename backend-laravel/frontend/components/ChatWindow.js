@@ -1,6 +1,7 @@
 // components/ChatWindow.js
 
 import { useState, useRef, useEffect } from 'react';
+import Image from 'next/image';
 import ReactMarkdown from 'react-markdown'; // <-- Sudah ada
 import remarkGfm from 'remark-gfm'; // <-- Sudah ada (untuk tabel/link)
 import rehypeRaw from 'rehype-raw'; // <-- TAMBAHAN BARU (untuk HTML seperti <hr>)
