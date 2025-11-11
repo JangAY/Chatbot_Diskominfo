@@ -65,7 +65,7 @@ export default function ChatWindow({ conversation, onSendMessage, loading, onQui
     // Tampilan Selamat Datang (jika tidak ada percakapan)
     if (!conversation && !loading) {
         return (
-            <div className="w-3/4 flex flex-col items-center justify-center h-screen bg-gray-50 p-4">
+            <div className="w-full flex flex-col items-center justify-center h-screen bg-gray-50 p-4">
                 <div className="text-center">
                     <div className="w-16 h-16 rounded-full bg-blue-500 flex items-center justify-center mx-auto mb-4 shadow-lg">
                         <span className="text-white font-bold text-2xl">SDG</span>
@@ -106,7 +106,7 @@ export default function ChatWindow({ conversation, onSendMessage, loading, onQui
     }
 
     return (
-        <div className="w-3/4 flex flex-col h-screen bg-gray-50">
+        <div className="w-full flex flex-col h-screen bg-gray-50">
             {/* Header Chat */}
             <div className="p-4 border-b border-gray-200 bg-white shadow-sm">
                 <h2 className="text-xl font-semibold text-gray-800">{conversation?.title || "Satu Data Garut"}</h2>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react'; // Hapus useEffect
-import Sidebar from '@/components/Sidebar';
+
 import ChatWindow from '@/components/ChatWindow';
 
 const LARAVEL_API_URL = 'http://localhost:8000/api';
@@ -116,11 +116,7 @@ export default function Home() {
 
     return (
         <main className="flex h-screen bg-gray-100 font-inter">
-            <Sidebar
-                // --- PERUBAHAN: Hapus prop yang tidak perlu ---
-                onNewChat={handleNewChat}
-                // Hapus: history, onSelectConversation, loading, currentConversationId
-            />
+            
             <ChatWindow
                 conversation={conversation}
                 onSendMessage={handleSendMessage}
