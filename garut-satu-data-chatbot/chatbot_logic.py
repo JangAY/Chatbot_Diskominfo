@@ -46,7 +46,8 @@ CORS(app, resources={r"/api/*": {"origins": "http://localhost:8000"}})
 
 print("Flask: Memuat model embedding...")
 generation_model = genai.GenerativeModel(
-    model_name='gemini-1.5-flash',
+    # --- PERBAIKAN: Model '2.5-flash' tidak valid. Gunakan '1.5-flash'. ---
+    model_name='gemini-2.5-flash', 
     safety_settings=safety_settings
 )
 embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
@@ -62,7 +63,8 @@ except Exception as e:
     site_guide_collection = None
     dataset_collection = None
 
-DISTANCE_THRESHOLD = 1.1
+# --- PERBAIKAN: Threshold diperketat untuk mengurangi hasil "ngawur" ---
+DISTANCE_THRESHOLD = 0.7 # Sebelumnya 1.1
 
 # --- 2. FUNGSI LOGIKA CHATBOT ---
 
@@ -97,15 +99,22 @@ def correct_query_with_llm(user_query: str) -> str:
         return user_query
 
 def classify_intent(processed_query: str, raw_query: str) -> str:
-    # (Fungsi ini tidak berubah)
     raw_lower = raw_query.lower().strip()
+    
     if raw_lower == "apa saja dataset yang tersedia?":
         return "list_sectors"
+    
+    # --- PERBAIKAN: Deteksi pencarian sektor ---
+    if raw_lower.startswith("tampilkan dataset sektor"):
+        return "dataset_sector_search"
+
     general_keywords = [
         "siapa kamu", "apa itu", "bagaimana cara", "jelaskan", "apa yang dimaksud"
     ]
     if any(raw_lower.startswith(key) for key in general_keywords):
         return "general_question"
+    
+    # Jika bukan di atas, baru jalankan agen data
     return "run_data_agent"
 
 def handle_general_question(query: str) -> dict:
@@ -193,9 +202,9 @@ def analyze_data_with_llm(df: pd.DataFrame, query: str) -> str:
         "Tugas Anda adalah bertindak sebagai analis data yang sangat teliti untuk 'Kabupaten Garut'.\n"
         "Gunakan HANYA tabel data di bawah ini untuk menjawab pertanyaan pengguna.\n"
         "Ikuti langkah-langkah berpikir ini:\n"
-        "Langkah 1: Baca Pertanyaan Pengguna. Identifikasi kata kunci utamanya (misal: 'penduduk miskin', '2022').\n"
-        "Langkah 2: Saring baris tabel. Cari baris di tabel yang kolomnya cocok dengan kata kunci.\n"
-        "Langkah 3: Ekstrak data. Temukan kolom yang berisi angka/jawaban.\n"
+        "Langkah 1: Baca Pertanyaan Pengguna. Identifikasi kata kunci utamanya (misal: 'penduduk miskin', '2022', 'harga bawang merah').\n"
+        "Langkah 2: Saring baris tabel. Cari baris di tabel yang kolomnya (seperti 'uraian' atau 'nama_komoditas') cocok dengan kata kunci.\n"
+        "Langkah 3: Ekstrak data. Temukan kolom yang berisi angka/jawaban (misal: 'jumlah', 'harga').\n"
         "Langkah 4: Format jawaban. Berikan jawaban dalam satu kalimat singkat.\n"
         "PENTING:\n"
         "- Konteks data ini adalah 'Kabupaten Garut'. JANGAN menyebut 'Indonesia'.\n"
@@ -302,11 +311,9 @@ def handle_dataset_search(sub_query: str) -> dict:
         return {"status": "error", "query": sub_query, "error_message": "Error: Database dataset tidak dapat diakses."}
         
     try:
-        # --- PERBAIKAN LOGIKA PENCARIAN ---
-        # 1. JANGAN hapus tahun. Gunakan sub-query LENGKAP untuk pencarian.
-        #    Ini membuat pencarian jauh lebih spesifik.
-        # topic_query = re.sub(r'\b(20\d{2})\b', '', sub_query).strip() # <-- HAPUS BARIS INI
-        topic_query = sub_query # <-- GUNAKAN INI
+        # --- PERBAIKAN LOGIKA PENCARIAN (Bug "Padi") ---
+        # 1. Gunakan sub-query LENGKAP untuk pencarian semantik.
+        topic_query = sub_query
         
         print(f"[1] Membuat embedding untuk query LENGKAP: '{topic_query}'...")
         embedding_list = embedding_model.encode([topic_query]).tolist()
@@ -329,18 +336,13 @@ def handle_dataset_search(sub_query: str) -> dict:
         metadatas = results['metadatas'][0]
         documents = results['documents'][0]
         for i in range(len(distances)):
-            if distances[i] < DISTANCE_THRESHOLD:
+            if distances[i] < DISTANCE_THRESHOLD: # Menggunakan THRESHOLD yang sudah diperketat
                 candidate_datasets.append((metadatas[i], documents[i]))
         
         if not candidate_datasets:
             return {"status": "error", "query": sub_query, "error_message": f"Maaf, saya tidak dapat menemukan dataset yang cukup relevan untuk '{sub_query}'."}
         
-        # --- PERBAIKAN LOGIKA FILTER ---
-        # 3. HAPUS filter tahun.
-        #    Embedding model sudah menangani pencocokan tahun.
-        #    Filter ini yang menyebabkan bug (memilih data Padi).
-        
-        # Cukup ambil hasil teratas (paling relevan)
+        # 3. Ambil hasil teratas (paling relevan).
         final_dataset = candidate_datasets[0] 
         print(f"Mengambil hasil teratas yang relevan: {final_dataset[0].get('title')}")
         # --- AKHIR PERBAIKAN LOGIKA FILTER ---
@@ -381,6 +383,45 @@ def handle_dataset_search(sub_query: str) -> dict:
         traceback.print_exc() 
         return {"status": "error", "query": sub_query, "error_message": f"Maaf, terjadi kesalahan saat mencari data untuk '{sub_query}'."}
 
+# --- FUNGSI BARU: Pencarian Sektor (Akurat) ---
+def handle_sector_search(sector_name: str) -> dict:
+    """
+    Mencari dataset berdasarkan filter metadata 'publisher' yang akurat.
+    """
+    print(f"--- Memulai handle_sector_search untuk sektor: '{sector_name}' ---")
+    if not dataset_collection:
+        return {"reply": "Error: Database dataset tidak dapat diakses."}
+    
+    try:
+        # Gunakan filter WHERE yang ketat, bukan pencarian semantik
+        results = dataset_collection.get(
+            where={"publisher": sector_name},
+            # n_results=5, # n_results tidak valid untuk .get()
+            include=["metadatas"]
+        )
+        
+        metadatas = results.get('metadatas')
+        if not metadatas:
+            print(f"[!] Tidak ditemukan dataset untuk publisher = '{sector_name}'")
+            return {"reply": f"Maaf, saya tidak menemukan dataset untuk sektor '{sector_name}'."}
+
+        # Format sebagai daftar markdown
+        response_list = [f"Tentu, berikut adalah beberapa dataset teratas untuk **{sector_name}**:\n"]
+        # Batasi hingga 5 hasil
+        for metadata in metadatas[:5]:
+            title = metadata.get('title', 'Tanpa Judul')
+            url = metadata.get('url', '#')
+            response_list.append(f"* **{title}** - [Lihat Halaman Data]({url})")
+        
+        return {"reply": "\n".join(response_list)}
+        
+    except Exception as e:
+        print(f"!!!!!!!!!!!!!!! KESALAHAN FATAL DI handle_sector_search !!!!!!!!!!!!!!!")
+        print(f"Error saat mencari data untuk '{sector_name}': {e}")
+        traceback.print_exc()
+        return {"reply": f"Maaf, terjadi kesalahan saat mencari data untuk sektor '{sector_name}'."}
+
+
 # --- 3. ENDPOINT API FLASK (Diperbarui) ---
 @app.route("/api/chat", methods=["POST"])
 def handle_chat():
@@ -414,6 +455,15 @@ def handle_chat():
     elif intent == 'list_sectors':
         response_data = handle_list_sectors()
     
+    # --- PERBAIKAN: Memanggil fungsi pencarian sektor yang benar ---
+    elif intent == 'dataset_sector_search':
+        try:
+            sector_name = corrected_user_query.split("Tampilkan dataset sektor ", 1)[1]
+            response_data = handle_sector_search(sector_name)
+        except Exception as e:
+            print(f"Error saat parsing nama sektor: {e}")
+            response_data = {"reply": "Maaf, terjadi kesalahan saat memproses permintaan sektor Anda."}
+    
     elif intent == 'run_data_agent':
         try:
             # Langkah 4a: Dekomposisi Query
@@ -424,7 +474,7 @@ def handle_chat():
             # Langkah 4b: Eksekusi setiap sub-query
             all_results = []
             for q in sub_queries:
-                print(f"--- Mengeksekusi sub-query: {q} ---")
+                print(f"--- Mengeksekusi sub-query (Agent): {q} ---")
                 result_dict = handle_dataset_search(q) 
                 all_results.append(result_dict)
             
@@ -462,6 +512,7 @@ def handle_chat():
                     print(f"Gagal membuat ringkasan akhir: {e}")
                     final_summary = "Berikut adalah data yang berhasil saya temukan:"
             else:
+                # --- PERBAIKAN: Memberikan ringkasan yang lebih baik jika GAGAL ---
                 final_summary = "Maaf, saya tidak dapat menemukan data spesifik yang Anda minta."
 
             # Langkah 4d: Format Blok Data
@@ -480,10 +531,12 @@ def handle_chat():
             # Langkah 4e: Gabungkan Semua
             combined_reply = final_summary 
             if data_blocks:
-                # --- PERBAIKAN TYPO DI SINI ---
-                # Mengganti 'class ' (spasi) dengan 'class=' (=)
+                # --- PERBAIKAN TYPO HTML ---
                 combined_reply += "\n\n<hr class='my-4 border-gray-300'>\n\n" + "\n\n<hr class='my-4 border-gray-300'>\n\n".join(data_blocks)
-            if failed_messages:
+            
+            # --- PERBAIKAN: Tampilkan pesan gagal HANYA jika TIDAK ada hasil sukses ---
+            if not successful_results and failed_messages:
+                # Jika tidak ada satupun yang sukses, baru tampilkan pesan error
                 combined_reply += "\n\n" + "\n".join(failed_messages)
 
             response_data = {'reply': combined_reply}

@@ -5,8 +5,8 @@ import chromadb
 from sentence_transformers import SentenceTransformer
 
 # --- KONFIGURASI ---
-API_URL = "httpss://satudata-api.garutkab.go.id/api/data"
-STATIC_KNOWLEDGE_FILE = "knowledge_base_static.json"
+API_URL = "https://satudata-api.garutkab.go.id/api/data"
+STATIC_KNOWLEDGE_FILE = "knowledge_base.json"
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(SCRIPT_DIR, "chatbot_db")
 

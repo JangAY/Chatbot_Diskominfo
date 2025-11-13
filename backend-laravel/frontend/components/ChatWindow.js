@@ -124,16 +124,24 @@ export default function ChatWindow({ conversation, onSendMessage, loading, onQui
                 {conversation?.messages?.map((msg, index) => (
                     <Message key={msg.id || `msg-${index}`} sender={msg.sender} content={msg.content} />
                 ))}
+                
+                {/* --- PERUBAHAN DI SINI --- */}
+                {/* Menampilkan indikator loading balasan AI */}
                 {loading && conversation?.messages && (
                     <div className="flex justify-start mb-4">
                         <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center mr-3 flex-shrink-0 shadow-md">
                             <span className="text-white font-bold">AI</span>
                         </div>
                         <div className="max-w-xl p-4 rounded-lg bg-white text-gray-800 border border-gray-200 rounded-bl-none shadow-md">
-                            <span className="loading loading-dots loading-sm"></span>
+                            {/* Tambahkan teks di sebelah spinner */}
+                            <div className="flex items-center space-x-2">
+                                <span className="loading loading-dots loading-sm"></span>
+                                <span className="text-sm italic text-gray-600">AI sedang berfikir . . .</span>
+                            </div>
                         </div>
                     </div>
                 )}
+                {/* --- AKHIR PERUBAHAN --- */}
                  <div ref={messagesEndRef} />
             </div>
 
