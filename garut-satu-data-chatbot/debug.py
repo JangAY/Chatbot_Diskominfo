@@ -1,7 +1,6 @@
-import chromadb
-client = chromadb.PersistentClient(path="chatbot_db")
-col = client.get_collection("kumpulan_dataset")
+from chromadb import PersistentClient
 
-peek = col.peek(3)
-for m in peek['metadatas'][0:]:
-    print(m)
+client = PersistentClient("./chatbot_db")
+
+print("Available Collections:")
+print(client.list_collections())

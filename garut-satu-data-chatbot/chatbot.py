@@ -35,30 +35,6 @@ log = logging.getLogger("chatbot")
 load_dotenv()
 
 # -------------------------
-# SIMPLE IN-MEMORY CACHE (TTL)
-# -------------------------
-# key -> { "answer": str, "ts": epoch_seconds }
-CACHE_TTL_SECONDS = 24 * 3600  # 24 jam
-cache_memory: Dict[str, Dict[str, Any]] = {}
-
-def cache_get(key: str) -> Optional[str]:
-    k = key.strip().lower()
-    v = cache_memory.get(k)
-    if not v:
-        return None
-    if time.time() - v.get("ts", 0) > CACHE_TTL_SECONDS:
-        log.debug("[CACHE] key expired: %s", k)
-        cache_memory.pop(k, None)
-        return None
-    log.debug("[CACHE] hit for key: %s", k)
-    return v.get("answer")
-
-def cache_set(key: str, answer: str) -> None:
-    k = key.strip().lower()
-    cache_memory[k] = {"answer": answer, "ts": time.time()}
-    log.debug("[CACHE] saved key: %s", k)
-
-# -------------------------
 # PREPROCESS (fallback)
 # -------------------------
 try:
@@ -153,30 +129,40 @@ except Exception as e:
 def search_dataset_embeddings(query: str, n_results: int = 5):
     try:
         if "dataset" not in chroma_collections:
-            logging.warning("[CHROMA] Koleksi dataset belum dimuat, membuat ulang...")
             chroma_collections["dataset"] = chroma_client.get_or_create_collection("dataset_embeddings")
 
         collection = chroma_collections["dataset"]
         query_vector = embedding_model.encode([query]).tolist()
+
+        # Ambil juga documents, ini penting!
         result = collection.query(
             query_embeddings=query_vector,
             n_results=n_results,
-            include=["metadatas", "distances"]
+            include=["metadatas", "documents", "distances"]
         )
 
-        # Parsing hasil pencarian
         datasets = []
-        for meta, dist in zip(result["metadatas"][0], result["distances"][0]):
-            meta["_distance"] = dist
+        metas = result.get("metadatas", [[]])[0]
+        docs = result.get("documents", [[]])[0]
+        dists = result.get("distances", [[]])[0]
+
+        for i, meta in enumerate(metas):
+            if not isinstance(meta, dict):
+                meta = {"title": str(meta)}
+
+            meta["_distance"] = dists[i]
+            meta["_document"] = docs[i]
             datasets.append(meta)
 
         return datasets
+
     except Exception as e:
-        logging.exception("[SEARCH_DATASET] Terjadi error: %s", e)
+        logging.exception("[SEARCH_DATASET] error: %s", e)
         return []
+    
 
 # Embedding distance threshold (tuneable)
-DISTANCE_THRESHOLD = 0.45
+DISTANCE_THRESHOLD = 1.10
 
 # -------------------------
 # UTIL FUNCTIONS
@@ -513,12 +499,42 @@ def handle_dataset_search(query: str, show_preview: bool = False):
                 "error_message": f"Tidak ditemukan dataset relevan untuk '{query}'."
             }
 
-        # Ambil dataset terdekat
-        chosen = candidates[0]
-        title = chosen.get("title", "Dataset tanpa judul")
-        # Ambil landing_page jika ada, fallback ke download_url
-        landing_page = chosen.get("landing_page") or chosen.get("download_url")
+        # Filter candidates untuk jarak <= threshold
+        candidates = [c for c in candidates if c.get("_distance", 0.70) <= DISTANCE_THRESHOLD]
+        if not candidates:
+            return {
+                "status": "error",
+                "query": query,
+                "error_message": f"Tidak ditemukan dataset relevan untuk '{query}'."
+            }
 
+        # Ambil dataset terdekat yang relevan
+        chosen = candidates[0]
+
+        log.info("[DATA_AGENT] Kandidat relevan:")
+        for c in candidates:
+            log.info("   TITLE=%s | DIST=%.3f | URL=%s",
+                     c.get("title") or c.get("judul"),
+                     c.get("_distance"),
+                     c.get("download_url"))        
+        
+        title = (
+            chosen.get("title")
+            or chosen.get("judul")
+            or chosen.get("name")
+            or chosen.get("dataset")
+            or "Dataset tanpa judul"
+        )
+
+        download_url = (
+            chosen.get("download_url")
+            or chosen.get("source")
+            or chosen.get("file_url")
+            or chosen.get("link")
+        )
+
+        landing_page = chosen.get("landing_page") or download_url or "#"
+        
         df = load_full_dataframe_from_url(chosen.get("download_url"))
         if df is None or df.empty:
             return {
@@ -527,10 +543,8 @@ def handle_dataset_search(query: str, show_preview: bool = False):
                 "error_message": f"Dataset '{title}' tidak memiliki data yang dapat dianalisis."
             }
 
-        # Analisis konten jika relevan
         analysis = analyze_data_with_llm(query, df)
 
-        # Tampilkan preview jika diminta
         preview_md = ""
         data_preview = []
         if show_preview:
@@ -538,17 +552,15 @@ def handle_dataset_search(query: str, show_preview: bool = False):
             data_preview = preview_df.to_dict(orient="records")
             preview_md = tabulate(preview_df, headers='keys', tablefmt='github')
 
-        response_text = f"**{title}**\n"
-        response_text += f"**Analisis:** {analysis}\n"
+        response_text = f"**{title}**\n**Analisis:** {analysis}\n"
         if show_preview:
-            response_text += f"\n**Pratinjau Data:**\n{preview_md}\n"
-            response_text += f"Sumber: {landing_page}"
+            response_text += f"\n**Pratinjau Data:**\n{preview_md}\nSumber: {landing_page}"
 
         return {
             "status": "success",
             "query": query,
             "dataset_title": title,
-            "dataset_url": landing_page,  # <-- ganti di sini
+            "dataset_url": landing_page,
             "landing_page": landing_page,
             "data_preview": data_preview,
             "ai_analysis": analysis,
@@ -586,17 +598,29 @@ def handle_list_sectors() -> dict:
     try:
         data = dataset_collection.get(include=["metadatas"])
         publishers = set()
+
         for md in data.get("metadatas", []):
-            if isinstance(md, dict) and md.get("publisher"):
-                publishers.add(md.get("publisher"))
+            # debug print isi md
+            log.debug("[LIST] md content: %s", md)
+
+            # jika md adalah list atau dict nested
+            if isinstance(md, dict) and "publisher" in md:
+                publishers.add(md["publisher"])
+            elif isinstance(md, list):
+                for sub in md:
+                    if isinstance(sub, dict) and "publisher" in sub:
+                        publishers.add(sub["publisher"])
+
         if not publishers:
             return {"reply": "Maaf, saat ini tidak ada sektor yang terdaftar di database."}
+
         new_replies = [{"label": p, "value": f"Tampilkan dataset sektor {p}"} for p in sorted(list(publishers))]
         return {"reply": "Tentu, berikut daftar sektor (OPD) yang datanya tersedia.", "newQuickReplies": new_replies}
+
     except Exception as e:
         log.debug("[LIST] error: %s", e)
         return {"reply": "Maaf, terjadi kesalahan saat mengambil daftar sektor."}
-
+    
 # -------------------------
 # SECTOR SEARCH
 # -------------------------
@@ -604,15 +628,21 @@ def handle_sector_search(sector_name: str) -> dict:
     if dataset_collection is None:
         return {"reply": "Error: Database dataset tidak dapat diakses."}
     try:
-        res = dataset_collection.get(where={"publisher": sector_name}, include=["metadatas"])
-        metas = res.get("metadatas", [])
+        data = dataset_collection.get(include=["metadatas"])
+        # Filter berdasarkan publisher, bukan title
+        metas = [
+            md for md in data.get("metadatas", [])
+            if md.get("publisher", "").strip().lower() == sector_name.strip().lower()
+        ]
         if not metas:
             return {"reply": f"Maaf, saya tidak menemukan dataset untuk sektor '{sector_name}'."}
+
         response_list = [f"Tentu, berikut beberapa dataset teratas untuk **{sector_name}**:"]
         for md in metas[:10]:
             title = md.get("title", "Tanpa Judul")
-            landing = md.get("landing_page") or md.get("download_url") or "#"
-            response_list.append(f"* **{title}** - [halaman sumber data]({landing})")
+            url = md.get("landing_page") or md.get("download_url") or "#"
+            response_list.append(f"* **{title}** - {url}")
+
         return {"reply": "\n".join(response_list)}
     except Exception as e:
         log.debug("[SECTOR] error: %s", e)
@@ -653,11 +683,7 @@ def handle_chat():
         user_query = str(req["query"]).strip()
         log.info("[REQUEST] %s", user_query)
 
-        # Cache check
-        cached = cache_get(user_query)
-        if cached:
-            return jsonify({"reply": cached, "cached": True}), 200
-
+        
         # Preprocess & classify
         processed = preprocess_text(user_query)
         intent = classify_intent(processed, user_query)
@@ -669,14 +695,14 @@ def handle_chat():
         if intent == "general_question":
             out = handle_general_question(user_query)
             reply = out.get("reply", "Maaf, terjadi kesalahan.")
-            cache_set(user_query, reply)
+            # cache_set(user_query, reply)
             return jsonify({"reply": reply}), 200
 
         # ---- LIST SECTORS ----
         if intent == "list_sectors":
             out = handle_list_sectors()
             reply = out.get("reply", "Maaf, terjadi kesalahan.")
-            cache_set(user_query, reply)
+            # cache_set(user_query, reply)
             return jsonify(out), 200
 
         # ---- SECTOR SEARCH ----
@@ -685,7 +711,7 @@ def handle_chat():
                 sector_name = user_query.split("Tampilkan dataset sektor", 1)[-1].strip()
                 out = handle_sector_search(sector_name)
                 reply = out.get("reply", "")
-                cache_set(user_query, reply)
+                # cache_set(user_query, reply)
                 return jsonify(out), 200
             except Exception as e:
                 log.exception("sector parse error: %s", e)
@@ -720,16 +746,16 @@ def handle_chat():
                         if landing:
                             pieces.append(f"[Kunjungi halaman dataset]({landing})\n")
                 final_reply = "\n".join(pieces).strip()
-                cache_set(user_query, final_reply)
+                # cache_set(user_query, final_reply)
                 return jsonify({"reply": final_reply, "results": successful}), 200
             else:
                 combined = "\n".join(errors) if errors else "Maaf, saya tidak menemukan data yang dimaksud."
-                cache_set(user_query, combined)
+                # cache_set(user_query, combined)
                 return jsonify({"reply": combined, "results": []}), 200
 
         # ---- FALLBACK ----
         reply = "Maaf, saya belum bisa menjawab pertanyaan ini."
-        cache_set(user_query, reply)
+        # cache_set(user_query, reply)
         return jsonify({"reply": reply}), 200
 
     except Exception as e:
