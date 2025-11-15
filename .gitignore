@@ -20,6 +20,7 @@ frontend-nextjs/
 f r o n t e n d - n e x t j s / 
 
 chatbot_db/chroma.sqlite3
+chatbot_db/
 
  
  

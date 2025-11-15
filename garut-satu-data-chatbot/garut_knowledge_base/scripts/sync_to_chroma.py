@@ -2,43 +2,11 @@ import json
 import logging
 from bs4 import BeautifulSoup
 from garut_knowledge_base.config import KNOWLEDGE_PATH, CHROMA_DB_PATH, CHROMA_COLLECTION_NAME, EMBEDDING_MODEL_NAME
+from garut_knowledge_base.scripts.build_knowledge_base import build_embedding_text
 from langchain_chroma import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
 
 log = logging.getLogger("sync_to_chroma")
-
-
-# ============================================================
-#  FUNGSI BARU — Wajib dipakai agar embedding jadi akurat 🔥
-# ============================================================
-def build_embedding_text(item):
-    title = item.get("title", "")
-    tahun = str(item.get("tahun", ""))
-    publisher = item.get("publisher", "")
-
-    # Bersihkan HTML
-    desc = item.get("description") or item.get("deskripsi") or ""
-    desc_plain = BeautifulSoup(desc, "html.parser").get_text(" ", strip=True)
-
-    # Sinyal kuat utk reranker dan vector search
-    enriched = (
-        f"Ini adalah dataset berjudul {title}. "
-        f"Dataset ini membahas tentang {title}. "
-        f"Topik utama dataset ini: {title}. "
-        f"Dataset terkait tahun {tahun}. "
-        f"Kata kunci penting: {title} tahun {tahun}, {desc_plain}. "
-    )
-
-    text = f"""
-Judul Dataset: {title}
-Tahun: {tahun}
-Penerbit: {publisher}
-Deskripsi: {desc_plain}
-
-{enriched}
-"""
-    return text.strip()
-
 
 def sync_to_chroma():
     """Sync knowledge_base.json ke database vektor Chroma."""

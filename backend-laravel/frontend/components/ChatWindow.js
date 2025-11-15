@@ -1,9 +1,9 @@
 // components/ChatWindow.js
 
 import { useState, useRef, useEffect } from 'react';
-//import ReactMarkdown from 'react-markdown';
-//import remarkGfm from 'remark-gfm';
-//import rehypeRaw from 'rehype-raw';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
 import Image from 'next/image';
 
 // Komponen untuk pesan individual (tidak berubah)

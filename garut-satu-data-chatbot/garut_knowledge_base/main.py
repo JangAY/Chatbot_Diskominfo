@@ -11,7 +11,7 @@ if __package__ is None or __package__ == "":
     from garut_knowledge_base.scripts.fetch_api_data import fetch_and_save
     from garut_knowledge_base.scripts.build_knowledge_base import build_knowledge_base
     from garut_knowledge_base.scripts.sync_to_chroma import sync_to_chroma
-    from garut_knowledge_base.config import CHROMA_DB_PATH
+    from garut_knowledge_base.config import CHROMA_DB_PATH as CHROMA_PATH
 else:
     from .scripts.fetch_api_data import fetch_and_save
     from .scripts.build_knowledge_base import build_knowledge_base
@@ -34,7 +34,7 @@ def main():
     sync_to_chroma()
 
     print("✅ Semua proses selesai! Knowledge base telah diperbarui.")
-    print(f"📂 Lokasi ChromaDB: {CHROMA_DB_PATH}")
+    print(f"📂 Lokasi ChromaDB: {CHROMA_PATH}")
 
 
 if __name__ == "__main__":
