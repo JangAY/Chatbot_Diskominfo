@@ -1,7 +1,4 @@
-<<<<<<< Updated upstream
-=======
 // app/page.js
->>>>>>> Stashed changes
 'use client';
 import { useState, useEffect } from 'react';
 // Hapus import Sidebar
@@ -103,7 +100,7 @@ export default function Home() {
     setCurrentConversation(prev => ({
       ...prev,
       messages: prev && prev.messages ? [...prev.messages, userMessage] : [userMessage],
-      title: prev?.title || 'New Conversation'
+      title: prev?.title || 'Satu Data Garut'
     }));
 
     try {
@@ -191,69 +188,6 @@ export default function Home() {
       
       {/* Sidebar sudah dihapus */}
 
-<<<<<<< Updated upstream
-            const data = await response.json(); 
-
-            const botMessage = {
-                id: `bot-${Date.now()}`,
-                sender: 'bot',
-                content: data.reply,
-            };
-
-            // Cek tombol dinamis
-            if (data.newQuickReplies && data.newQuickReplies.length > 0) {
-                setQuickReplies(data.newQuickReplies);
-            } else {
-                setQuickReplies(DEFAULT_QUICK_REPLIES);
-            }
-            
-            // --- PERUBAHAN: Logika riwayat dihapus ---
-            // Cukup tambahkan pesan bot ke state sesi saat ini
-            setConversation(prev => ({
-                ...prev,
-                messages: [...prev.messages, botMessage],
-            }));
-
-        } catch (error) {
-            console.error("Gagal mengambil respons chatbot:", error);
-            const errorMessage = {
-                id: `error-${Date.now()}`,
-                sender: 'bot',
-                content: `Maaf, terjadi kesalahan koneksi ke server. (${error.message})`,
-            };
-            setConversation(prev => ({
-                ...prev,
-                messages: [...prev.messages, errorMessage],
-            }));
-            setQuickReplies(DEFAULT_QUICK_REPLIES); 
-        } finally {
-            setLoadingReply(false);
-        }
-    };
-
-    const handleNewChat = () => {
-        // Cukup bersihkan state sesi saat ini
-        setConversation(null);
-        setQuickReplies(DEFAULT_QUICK_REPLIES); 
-    };
-    
-    const handleQuickResponse = (value) => {
-        handleSendMessage(value);
-    };
-
-    return (
-        <main className="flex h-screen bg-gray-100 font-inter">
-            
-            <ChatWindow
-                conversation={conversation}
-                onSendMessage={handleSendMessage}
-                loading={loadingReply} // Hanya loading balasan
-                onQuickResponse={handleQuickResponse}
-                quickReplies={quickReplies}
-            />
-        </main>
-    );
-=======
       <ChatWindow
         conversation={currentConversation}
         onSendMessage={handleSendMessage}
@@ -263,5 +197,4 @@ export default function Home() {
       />
     </main>
   );
->>>>>>> Stashed changes
 }
