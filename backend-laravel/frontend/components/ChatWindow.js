@@ -12,13 +12,27 @@ const Message = ({ sender, content }) => {
     return (
         <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
             {!isUser && (
+<<<<<<< Updated upstream
                 <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center mr-3 flex-shrink-0 shadow-md">
                     <span className="text-white font-bold">AI</span>
+=======
+                // --- TEMA KUNING --- (Ikon AI)
+                <div className="w-10 h-10 rounded-full bg-red-400 flex items-center justify-center mr-3 flex-shrink-0 shadow-md">
+                    <span className="text-black font-bold">AI</span>
+>>>>>>> Stashed changes
                 </div>
             )}
             <div
                 className={`max-w-xl p-4 rounded-lg shadow-md ${
+<<<<<<< Updated upstream
                     isUser ? 'bg-blue-500 text-white rounded-br-none' : 'bg-white text-gray-800 border border-gray-200 rounded-bl-none'
+=======
+                    // --- TEMA KUNING ---
+                    // Gelembung pengguna menjadi kuning, teks hitam
+                    isUser ? 'bg-red-500 text-black rounded-br-none' 
+                           // Gelembung AI tetap abu-abu gelap
+                           : 'bg-gray-800 text-gray-100 border border-gray-700 rounded-bl-none'
+>>>>>>> Stashed changes
                 }`}
             >
                 {isUser ? (
@@ -161,8 +175,14 @@ export default function ChatWindow({ conversation, onSendMessage, loading, onQui
                             placeholder="Ketik pertanyaan anda di sini..."
                             className="flex-grow bg-transparent border-none focus:ring-0 text-gray-800 placeholder-gray-400 p-2"
                         />
+<<<<<<< Updated upstream
                         <button type="submit" className="btn btn-primary btn-circle" disabled={!input.trim() || loading}>
                            <svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5"><path d="M3.105 2.289a.75.75 0 00-.826.95l1.414 4.925A1.5 1.5 0 005.135 9.25h6.115a.75.75 0 010 1.5H5.135a1.5 1.5 0 00-1.442 1.086L2.279 16.76a.75.75 0 00.95.826l16-5.333a.75.75 0 000-1.418l-16-5.333z" /></svg>
+=======
+                        {/* --- TEMA KUNING --- (Tombol Send menjadi kuning, ikon hitam) */}
+                        <button type="submit" className="btn btn-circle bg-transparent hover:bg-white-500 border-none" disabled={!input.trim() || loading}>
+                           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="white" className="w-5 h-5"><path d="M3.105 2.289a.75.75 0 00-.826.95l1.414 4.925A1.5 1.5 0 005.135 9.25h6.115a.75.75 0 010 1.5H5.135a1.5 1.5 0 00-1.442 1.086L2.279 16.76a.75.75 0 00.95.826l16-5.333a.75.75 0 000-1.418l-16-5.333z" /></svg>
+>>>>>>> Stashed changes
                         </button>
                     </form>
                 </div>
