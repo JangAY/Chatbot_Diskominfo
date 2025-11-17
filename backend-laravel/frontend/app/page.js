@@ -1,200 +1,151 @@
-// app/page.js
+// app/page.js (GANTI SEMUA DENGAN KODE INI)
+
 'use client';
 import { useState, useEffect } from 'react';
-// Hapus import Sidebar
-import ChatWindow from '@/components/ChatWindow';
+import ChatWindow from '@/components/ChatWindow'; // ChatWindow Anda (normal atau baru)
 
-const API_URL = 'http://127.0.0.1:8000/api'; // URL Backend Laravel Anda
+// 1. GANTI URL API
+// Arahkan ke backend Python/Flask Anda, bukan Laravel
+const API_URL = 'http://127.0.0.1:5000/api/chat'; 
 
 export default function Home() {
-  // ... (Semua state Anda tetap sama)
-  const [history, setHistory] = useState([]);
+  // State Anda sudah benar
   const [currentConversation, setCurrentConversation] = useState(null);
-  const [currentConversationId, setCurrentConversationId] = useState(null);
-  const [loadingHistory, setLoadingHistory] = useState(true);
+  const [currentConversationId, setCurrentConversationId] = useState(null); // Kita akan atur ini
   const [loadingChat, setLoadingChat] = useState(false);
-  const [quickReplies, setQuickReplies] = useState([]); // State untuk quick replies
+  const [quickReplies, setQuickReplies] = useState([]);
 
-  // Fungsi untuk memuat riwayat
-  const fetchHistory = async () => {
-    setLoadingHistory(true);
-    try {
-      const res = await fetch(`${API_URL}/history`);
-      if (!res.ok) {
-        throw new Error(`HTTP error! status: ${res.status}`);
-      }
-      const data = await res.json();
-      setHistory(data);
-
-      // Set quick replies default HANYA jika tidak ada percakapan aktif
-      if (!currentConversationId) {
-        setQuickReplies([
-            { label: "Apa saja dataset yang tersedia?", value: "Apa saja dataset yang tersedia?" },
-            { label: "Tampilkan jumlah penduduk Garut.", value: "Tampilkan jumlah penduduk Garut." },
-            { label: "Bagaimana cara menggunakan portal ini?", value: "Bagaimana cara menggunakan portal ini?" },
-            { label: "Jelaskan metadata yang ada.", value: "Jelaskan metadata yang ada." }
-        ]);
-      }
-    } catch (error) {
-      console.error("Gagal memuat riwayat:", error);
-      // Mungkin set quick replies default di sini juga jika fetch gagal
+  // Fungsi untuk menampilkan quick replies default
+  const showDefaultQuickReplies = () => {
+    // Tampilkan hanya jika belum ada percakapan
+    if (!currentConversation) { 
       setQuickReplies([
         { label: "Apa saja dataset yang tersedia?", value: "Apa saja dataset yang tersedia?" },
-        { label: "Tampilkan jumlah penduduk Garut.", value: "Tampilkan jumlah penduduk Garut." },
+        { label: "Tampilkan jumlah penduduk miskin tahun 2024.", value: "Tampilkan jumlah penduduk miskin tahun 2024." },
         { label: "Bagaimana cara menggunakan portal ini?", value: "Bagaimana cara menggunakan portal ini?" },
         { label: "Jelaskan metadata yang ada.", value: "Jelaskan metadata yang ada." }
       ]);
-    } finally {
-      setLoadingHistory(false);
     }
   };
 
-  // Fungsi untuk memuat percakapan spesifik
-  const fetchConversation = async (id) => {
-    setLoadingChat(true);
-    setQuickReplies([]); // Kosongkan quick replies saat memuat
-    if (!id) {
-      setCurrentConversation(null);
-      setCurrentConversationId(null);
-      setLoadingChat(false);
-      fetchHistory(); // Panggil fetchHistory untuk reset quick replies
-      return;
-    }
-    try {
-      const res = await fetch(`${API_URL}/conversation/${id}`);
-      if (!res.ok) {
-        throw new Error(`HTTP error! status: ${res.status}`);
-      }
-      const data = await res.json();
-      setCurrentConversation(data);
-      setCurrentConversationId(id);
-      // Percakapan lama biasanya tidak punya quick replies
-      setQuickReplies([]); 
-    } catch (error) {
-      console.error("Gagal memuat percakapan:", error);
-    } finally {
-      setLoadingChat(false);
-    }
-  };
-
-  // Fungsi untuk memulai chat baru
-  const startNewChat = () => {
-    setCurrentConversation(null);
-    setCurrentConversationId(null);
-    fetchHistory(); // Panggil fetchHistory untuk reset quick replies ke default
-  };
-
-  // Muat riwayat saat komponen pertama kali dimuat
+  // Muat quick replies default saat pertama kali buka
   useEffect(() => {
-    fetchHistory();
+    showDefaultQuickReplies();
   }, []); // Hanya dijalankan sekali
 
-  // Fungsi mengirim pesan
+  
+  // 2. GANTI TOTAL FUNGSI handleSendMessage
+  // Ini adalah perbaikan utama. Logika ini sekarang sesuai
+  // dengan respons JSON {"reply": "..."} dari chatbot.py
   const handleSendMessage = async (message) => {
     if (!message.trim()) return;
-    setLoadingChat(true); // Tampilkan loading AI
-    setQuickReplies([]); // Sembunyikan quick replies saat mengirim
 
-    const userMessage = { id: `temp-${Date.now()}-user`, sender: 'user', content: message };
+    setLoadingChat(true); // Tampilkan loading "AI sedang berfikir"
+    setQuickReplies([]); // Sembunyikan quick replies
+
+    const userMessage = { 
+      id: `user-${Date.now()}`, 
+      sender: 'user', 
+      content: message 
+    };
+
+    // Tampilkan pesan user segera
+    const newConversation = currentConversation 
+      ? { ...currentConversation, messages: [...currentConversation.messages, userMessage] }
+      : { id: 'conv-1', title: 'Satu Data Garut', messages: [userMessage] };
+      
+    setCurrentConversation(newConversation);
     
-    setCurrentConversation(prev => ({
-      ...prev,
-      messages: prev && prev.messages ? [...prev.messages, userMessage] : [userMessage],
-      title: prev?.title || 'Satu Data Garut'
-    }));
+    // Set ID percakapan agar layar sambutan hilang
+    if (!currentConversationId) {
+        setCurrentConversationId('conv-1'); 
+    }
 
     try {
-      const res = await fetch(`${API_URL}/chat`, {
+      // Kirim ke API_URL (Python)
+      const res = await fetch(API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify({ message, conversation_id: currentConversationId }),
+        // Backend Python hanya butuh 'query'
+        body: JSON.stringify({ query: message }), 
       });
 
       if (!res.ok) {
-          const errorText = await res.text();
-          console.error("Gagal mengirim pesan. Status:", res.status, "Respons Server:", errorText);
-          // Tampilkan pesan error ke pengguna
-          const errorBotMessage = {
-            id: `temp-${Date.now()}-bot-error`,
-            sender: 'bot',
-            content: `**Maaf, terjadi kesalahan.**\n\nServer tidak merespons dengan benar (Status: ${res.status}). Silakan coba lagi nanti.`
-          };
-          setCurrentConversation(prev => ({
-            ...prev,
-            messages: [...prev.messages.filter(m => m.id !== userMessage.id), userMessage, errorBotMessage],
-          }));
-          throw new Error(`Gagal mengirim pesan (Status: ${res.status})`);
+        throw new Error(`Server error: ${res.status}`);
       }
 
+      // Ambil data respons: {"reply": "...", "newQuickReplies": [...]}
       const data = await res.json();
 
-      if (currentConversationId !== data.conversation_id) {
-        // Ini adalah percakapan baru, panggil fetchConversation untuk data lengkap
-        setCurrentConversationId(data.conversation_id);
-        await fetchConversation(data.conversation_id);
-        // await fetchHistory(); // panggil jika ingin update sidebar (jika ada)
-      } else {
-        // Ini adalah percakapan yang ada, update pesannya
-        setCurrentConversation(prev => ({
-          ...prev,
-          messages: [
-            ...prev.messages.filter(m => m.id !== userMessage.id),
-            data.user_message, // Gunakan data asli dari server
-            data.bot_reply
-          ],
-        }));
-      }
-      
-      // --- PERUBAHAN DI SINI ---
-      // Blok kode di bawah ini (yang mengembalikan quick replies baru)
-      // telah dihapus agar quick replies tidak muncul lagi setelah chat pertama.
-      /*
-      setQuickReplies([
-        { label: "Tanyakan hal lain?", value: "Apa lagi yang bisa kamu lakukan?" },
-        { label: "Terima kasih!", value: "Terima kasih!" },
-      ]);
-      */
-      // --- AKHIR PERUBAHAN ---
+      // Buat objek pesan bot
+      const botMessage = {
+        id: `bot-${Date.now()}`,
+        sender: 'bot',
+        content: data.reply // Ambil 'reply' dari JSON
+      };
 
+      // Update percakapan dengan jawaban bot
+      setCurrentConversation(prev => ({
+        ...prev,
+        messages: [...prev.messages, botMessage],
+      }));
+
+      // Cek apakah backend mengirim quick replies baru
+      if (data.newQuickReplies && data.newQuickReplies.length > 0) {
+        setQuickReplies(data.newQuickReplies);
+      } else {
+        // Jika tidak ada, kembali ke default (jika ini chat baru)
+        // atau biarkan kosong (jika chat sudah berjalan)
+        // Untuk Skenario Anda: biarkan kosong setelah jawaban
+        setQuickReplies([]);
+      }
 
     } catch (error) {
       console.error("Gagal mengirim pesan:", error);
-      // Pastikan pesan error ditampilkan jika fetch gagal total
-      if (!currentConversation?.messages?.find(m => m.id.includes('bot-error'))) {
-        const networkErrorBotMessage = {
-          id: `temp-${Date.now()}-bot-error`,
-          sender: 'bot',
-          content: `**Maaf, koneksi ke server gagal.**\n\nPastikan server backend Anda berjalan dan coba lagi.`
-        };
-        setCurrentConversation(prev => ({
-          ...prev,
-          messages: [...prev.messages.filter(m => m.id !== userMessage.id), userMessage, networkErrorBotMessage],
-        }));
-      }
+      // Tampilkan pesan error di chat
+      const errorBotMessage = {
+        id: `bot-error-${Date.now()}`,
+        sender: 'bot',
+        content: `**Maaf, terjadi kesalahan koneksi.**\n\nTidak dapat terhubung ke server chatbot. (Error: ${error.message})`
+      };
+      setCurrentConversation(prev => ({
+        ...prev,
+        messages: [...prev.messages, errorBotMessage],
+      }));
     } finally {
-        setLoadingChat(false); // Sembunyikan loading AI
+      setLoadingChat(false); // Sembunyikan loading
     }
   };
 
-  // Handle respons cepat (quick response buttons)
-  const handleQuickResponse = (text) => {
-    handleSendMessage(text);
+  // Fungsi untuk menangani klik quick reply
+  const handleQuickResponse = (message) => {
+    // Kirim pesan seolah-olah user yang mengetik
+    handleSendMessage(message);
   };
 
 
+  // RENDER UI
+  // Kita tidak perlu mengubah bagian ini.
+  // Selama file ChatWindow.js baru Anda masih menerima props:
+  // (conversation, onSendMessage, loading, onQuickResponse, quickReplies)
+  // maka ini akan berfungsi.
   return (
-    // --- TEMA MERAH ---
-    <main className="h-screen bg-red-100 font-inter"> 
+    <main className="flex h-screen w-full">
+      {/* Komponen Sidebar Anda yang lama mungkin ada di sini.
+        Tapi berdasarkan file lama, Anda menghapusnya untuk layout fullscreen.
+        Itu tidak masalah.
+      */}
       
-      {/* Sidebar sudah dihapus */}
-
-      <ChatWindow
-        conversation={currentConversation}
-        onSendMessage={handleSendMessage}
-        loading={loadingChat}
-        onQuickResponse={handleQuickResponse}
-        quickReplies={quickReplies} // Teruskan quick replies ke ChatWindow
-      />
+      {/* Bagian ini memuat komponen ChatWindow Anda */}
+      <div className="flex-1">
+        <ChatWindow
+          conversation={currentConversation}
+          onSendMessage={handleSendMessage}
+          loading={loadingChat}
+          onQuickResponse={handleQuickResponse} 
+          quickReplies={quickReplies}
+        />
+      </div>
     </main>
   );
 }
