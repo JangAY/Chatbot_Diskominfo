@@ -2,6 +2,10 @@ from flask import Flask, jsonify, request
 import threading
 import time
 import traceback
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from garut_knowledge_base.main import main as update_knowledge
 
 app = Flask(__name__)

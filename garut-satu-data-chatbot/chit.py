@@ -348,32 +348,53 @@ def find_date_column(df: pd.DataFrame) -> Optional[str]:
 # -------------------------
 # ANALYZE SUBSET WITH LLM (only if subset present)
 # -------------------------
-def analyze_data_with_llm(query: str, df: pd.DataFrame) -> str:
+# GANTI FUNGSI analyze_data_with_llm DENGAN INI
+
+def analyze_data_with_llm(query: str, df: pd.DataFrame, dataset_title: str, is_multi_data: bool = False) -> str:
+    """
+    Menganalisis DataFrame dengan prompt yang menyesuaikan jumlah data.
+    """
     try:
         df = df.copy()
         df.columns = [str(c).lower().replace(" ", "_") for c in df.columns]
 
-        # Ambil max 10 baris saja (untuk diringkas)
-        subset = df.head(10)
+        # Ambil sampel data
+        subset = df.head(30)
         subset_md = tabulate(subset, headers="keys", tablefmt="github")
 
-        prompt = f"""
+        # --- LOGIKA PROMPT DINAMIS ---
+        if is_multi_data:
+            # PROMPT KHUSUS UNTUK DATA BANYAK (Analisis Tren)
+            prompt = f"""
 Anda adalah asisten data resmi Satu Data Garut.
+User meminta data gabungan/perbandingan: "{query}"
 
-JANGAN membuat data baru atau mengarang angka.
-Jawaban Anda HARUS berdasarkan tabel berikut.
-Berikan jawaban analisis satu paragraf
+Tugas:
+1. Bandingkan data antar tahun/kategori dari tabel di bawah.
+2. Jelaskan **TREN**-nya (apakah naik, turun, atau fluktuatif).
+3. Berikan kesimpulan ringkas dari perbandingan tersebut.
 
-Pertanyaan: {query}
-
-Tabel data relevan (maks 10 baris):
+Tabel Data Gabungan:
 {subset_md}
 
-Tolong berikan:
-1. Data berdasarkan tabel.
-2. Tanpa data tambahan yang tidak ada di tabel.
+Jawaban (Fokus pada perbandingan & tren):
+"""
+        else:
+            # PROMPT KHUSUS UNTUK DATA TUNGGAL (Langsung ke poin)
+            prompt = f"""
+Anda adalah asisten data resmi Satu Data Garut.
+User meminta data spesifik: "{query}"
 
-Jika data yang diminta tidak ada dalam tabel, katakan apa adanya.
+Tugas:
+1. Sebutkan angka/data spesifik yang diminta user dari tabel di bawah.
+2. JANGAN berikan analisis tren jika datanya hanya satu tahun.
+3. Jawab dengan singkat dan padat.
+4. Gunakan bahasa Indonesia yang natural.
+
+Tabel Data (Sumber: {dataset_title}):
+{subset_md}
+
+Jawaban (Langsung ke data):
 """
 
         resp = run_gemini(prompt)
@@ -382,8 +403,7 @@ Jika data yang diminta tidak ada dalam tabel, katakan apa adanya.
     except Exception as e:
         log.exception("[LLM_ANALYZER] Error: %s", e)
         return "Maaf, terjadi kesalahan dalam analisis data."
-
-
+    
 # -------------------------
 # HELPER: summarize dataset doc
 # -------------------------
@@ -471,122 +491,64 @@ def query_datasets_semantic(query: str, n_results: int = 6) -> List[Dict[str, An
 # -------------------------
 # HANDLE DATASET SEARCH (core)
 # -------------------------
-def handle_dataset_search(query: str, show_preview: bool = False):
-    log.info("[DATA_AGENT] Mencari dataset untuk query: %s", query)
+def handle_dataset_search(query: str) -> Dict[str, Any]:
+    """
+    HANYA mencari dataset, memvalidasi, dan mengembalikan data mentah.
+    TIDAK melakukan analisis LLM di sini (dilakukan nanti di orchestrator).
+    """
+    log.info("[WORKER] Mencari dataset untuk sub-query: %s", query)
 
     try:
-        # 1. Ambil Top 5 kandidat semantik (seperti debug_query)
-        candidates = search_dataset_embeddings(query, n_results=5) # n_results=5 dari default fungsi
-
+        # 1. Cari kandidat
+        candidates = search_dataset_embeddings(query, n_results=5)
         if not candidates:
-            return {
-                "status": "error",
-                "query": query,
-                "error_message": f"Tidak ditemukan dataset yang relevan untuk: '{query}'."
-            }
+            return {"status": "error", "query": query, "error_message": f"Tidak ada dataset ditemukan untuk '{query}'."}
 
-        # 2. Iterasi dan Validasi (LOGIKA BARU YANG PENTING)
-        # Kita cari kandidat pertama yang *benar-benar* berisi data yang diminta.
-        
+        # 2. Iterasi & Validasi
         best_subset = None
-        chosen_dataset = None
+        chosen_dataset_meta = None
 
         for cand in candidates:
             title = cand.get("title") or cand.get("judul") or "Dataset"
             download_url = cand.get("download_url") or cand.get("file_url")
             dist = cand.get("_distance", 99.0)
 
-            if not download_url:
-                log.debug(f"[DATA_AGENT] Skipping '{title}' (no download_url)")
+            if not download_url or dist > 1.4:
                 continue
 
-            # Jangan buang kandidat hanya karena jarak, kecuali jaraknya sangat jauh
-            if dist > 1.4: # Threshold yang lebih longgar, biarkan konten yang menentukan
-                log.debug(f"[DATA_AGENT] Skipping '{title}' (Distance {dist:.4f} > 1.4)")
-                continue
-
-            log.debug(f"[DATA_AGENT] Validating candidate: '{title}' (Dist: {dist:.4f})")
-
-            # Unduh file untuk diinspeksi
+            # Load Data
             df = load_full_dataframe_from_url(download_url)
-            
             if df is None or df.empty:
-                log.debug(f"[DATA_AGENT] Skipping '{title}' (failed to load or empty)")
                 continue
                 
-            # Validasi: Apakah file ini berisi baris yang kita cari?
-            # (Misal: Apakah file 'Penduduk 2024' ini berisi '2022'?)
+            # Filter Baris Relevan
             subset = find_relevant_rows(df, query)
             
             if not subset.empty:
-                # --- DITEMUKAN! ---
-                # File ini adalah yang kita cari.
-                log.info(f"[DATA_AGENT] Match! '{title}' (Dist: {dist:.4f}) contains relevant data.")
+                log.info(f"[WORKER] Match! '{title}' contains relevant data.")
                 best_subset = subset
-                chosen_dataset = cand
-                break # Hentikan iterasi, kita sudah punya pemenangnya
-            else:
-                # File ini mirip, tapi tidak berisi data spesifik yang diminta.
-                log.debug(f"[DATA_AGENT] No relevant rows found in '{title}' for query.")
-
-        # 3. Handle jika TIDAK ADA yang cocok setelah iterasi
-        if best_subset is None or chosen_dataset is None:
-            log.warning(f"[DATA_AGENT] No validated match for: '{query}'. Top semantic hit: '{candidates[0].get('title')}'")
+                chosen_dataset_meta = cand
+                break 
+            
+        if best_subset is None or chosen_dataset_meta is None:
             return {
-                "status": "error",
-                "query": query,
-                "error_message": (
-                    f"Saya menemukan beberapa dataset yang mirip (misalnya: '{candidates[0].get('title')}'), "
-                    f"tetapi tidak ada yang berisi data spesifik untuk: '{query}'."
-                )
+                "status": "error", 
+                "query": query, 
+                "error_message": f"Data spesifik '{query}' tidak ditemukan di dataset yang relevan."
             }
 
-        # 4. PROSES PEMENANG
-        # Kita sekarang punya `best_subset` (DataFrame) dan `chosen_dataset` (Metadata)
-        
-        title = chosen_dataset.get("title") or "Dataset"
-        landing_page = chosen_dataset.get("landing_page") or chosen_dataset.get("download_url")
-
-        # Analisis menggunakan LLM HANYA pada baris yang relevan
-        ai_analysis = analyze_data_with_llm(query, best_subset)
-
-        # Siapkan preview jika diminta
-        data_preview = []
-        preview_md = ""
-        if show_preview:
-            preview_df = best_subset.head(5) # Ambil 5 baris pertama dari subset
-            data_preview = preview_df.to_dict(orient="records")
-            preview_md = tabulate(preview_df, headers="keys", tablefmt="github")
-
-        # 5. Susun Respon Final
-        response_text = (
-            f"**{title}**\n\n"
-            f"\n{ai_analysis}\n"
-        )
-
-        if show_preview and preview_md:
-            response_text += f"\n**Pratinjau Data Relevan:**\n{preview_md}"
-        
-        if landing_page:
-            response_text += f"\n\n[Lihat Dataset Lengkap]({landing_page})"
-
+        # BERHASIL: Kembalikan data mentah
         return {
             "status": "success",
-            "dataset_title": title,
-            "ai_analysis": ai_analysis,
-            "data_preview": data_preview,
-            "response_text": response_text, # Kita kirim teks lengkap
-            "landing_page": landing_page
+            "query": query,
+            "metadata": chosen_dataset_meta,
+            "subset_df": best_subset # DataFrame Pandas
         }
 
     except Exception as e:
-        log.exception("[DATA_AGENT] Unhandled Error: %s", e)
-        return {
-            "status": "error",
-            "query": query,
-            "error_message": "Terjadi error internal saat memproses dataset."
-        }
-
+        log.exception("[WORKER] Unhandled Error: %s", e)
+        return {"status": "error", "query": query, "error_message": "Error internal saat memproses dataset."}
+    
 # -------------------------
 # HANDLE GENERAL QUESTION (site guide)
 # -------------------------
@@ -684,6 +646,8 @@ def classify_intent(processed_query: str, raw_query: str) -> str:
 app = Flask(__name__)
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 
+global_chat_memory = {}
+
 @app.route("/api/health", methods=["GET"])
 def health():
     """Simple health check for orchestrator / frontend."""
@@ -733,25 +697,92 @@ def handle_chat():
                 log.exception("sector parse error: %s", e)
                 return jsonify({"reply": "Maaf, terjadi kesalahan saat memproses permintaan sektor Anda."}), 200
 
-# GANTI BLOK INI DI DALAM FUNGSI handle_chat (mulai baris 792)
 
         # ---- DATA AGENT ----
         if intent == "run_data_agent":
+            # 1. Pecah Query
             subs = decompose_query_with_llm(user_query)
             if not subs:
                 subs = [user_query]
 
-            all_results = []
-            for s in subs:
-                try:
-                    # 'show_preview' sudah diteruskan. 
-                    # 'handle_dataset_search' sekarang akan mengurus logikanya.
-                    res = handle_dataset_search(s, show_preview=show_preview)
-                    all_results.append(res)
-                except Exception as e:
-                    log.debug("[AGENT] error for sub %s: %s", s, e)
-                    all_results.append({"status": "error", "query": s, "error_message": "Error internal saat pencarian."})
+            all_dfs = []
+            all_metas = []
+            errors = []
 
+            # 2. Kumpulkan Data
+            for s in subs:
+                res = handle_dataset_search(s)
+                if res.get("status") == "success":
+                    all_dfs.append(res["subset_df"])
+                    all_metas.append(res["metadata"])
+                else:
+                    errors.append(res.get("error_message"))
+            
+            # 3. Cek Hasil Kosong
+            if not all_dfs:
+                combined_errors = "; ".join(list(set(errors)))
+                return jsonify({"reply": f"Maaf, data tidak ditemukan. ({combined_errors})", "results": []}), 200
+
+            # 4. PROSES DATA (Aggregation)
+            try:
+                combined_df = pd.concat(all_dfs, ignore_index=True)
+                
+                # Buat Judul
+                titles = list(set([m.get("title", "Data") for m in all_metas]))
+                
+                # --- DETEKSI: Single Data vs Multi Data ---
+                # Kita anggap 'Multi' jika ada lebih dari 1 DataFrame hasil pencarian
+                # ATAU jika baris di tabel gabungan > 1 (misal 1 file tapi range tahun 2020-2024)
+                is_multi_data = len(all_dfs) > 1 or len(combined_df) > 1
+                
+                combined_title_str = ", ".join(titles)
+                
+                # 5. Panggil LLM dengan flag is_multi_data
+                ai_analysis = analyze_data_with_llm(user_query, combined_df, combined_title_str, is_multi_data=is_multi_data)
+                
+                # 6. Format Link Sumber
+                links = []
+                seen_links = set()
+                for m in all_metas:
+                    url = m.get("landing_page") or m.get("download_url")
+                    t = m.get("title", "Dataset")
+                    if url and url not in seen_links:
+                        links.append(f"- [{t}]({url})")
+                        seen_links.add(url)
+                links_text = "\n".join(links)
+
+                # 7. Susun Jawaban Final (Header Dinamis)
+                if is_multi_data:
+                    # Header untuk Banyak Data
+                    header = f"**Analisis Data Gabungan:**"
+                else:
+                    # Header untuk Satu Data (Langsung Judul Dataset)
+                    header = f"**Sumber Data: {titles[0]}**"
+
+                final_reply = (
+                    f"{header}\n\n"
+                    f"{ai_analysis}\n\n"
+                    f"**Sumber dataset:**\n{links_text}"
+                )
+
+                # Optional Preview
+                if show_preview or (is_multi_data and len(combined_df) > 1):
+                     preview_md = tabulate(combined_df.head(10), headers="keys", tablefmt="github")
+                     final_reply += f"\n\n**Tabel Data:**\n{preview_md}"
+
+                # Simpan ke memory
+                global_chat_memory["last_result"] = {
+                    "status": "success",
+                    "combined_df": combined_df,
+                    "combined_title": combined_title_str
+                }
+
+                return jsonify({"reply": final_reply, "results": titles}), 200
+
+            except Exception as e:
+                log.exception("[AGENT] Error processing data: %s", e)
+                return jsonify({"reply": "Data ditemukan, namun gagal diproses."}), 200
+            
             successful = [r for r in all_results if r.get("status") == "success"]
             errors = [r.get("error_message") for r in all_results if r.get("status") == "error"]
 
