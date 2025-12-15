@@ -8,46 +8,59 @@ import Image from 'next/image';
 // HAPUS: import { ThemeSwitcher } from './ThemeSwitcher';
 
 // Komponen untuk pesan individual
-const Message = ({ sender, content }) => {
+const Message = ({ sender, content, options, onOptionClick }) => {
     const isUser = sender === 'user';
-    return (
-        <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
-            {!isUser && (
-                // --- TEMA KUNING --- (Ikon AI)
-                <div className="w-10 h-10 rounded-full bg-yellow-400 flex items-center justify-center mr-3 flex-shrink-0 shadow-md">
-                    <span className="text-black font-bold">AI</span>
-                </div>
-            )}
-            <div
-                className={`max-w-xl p-4 rounded-lg shadow-md ${
-                    // --- TEMA KUNING ---
-                    // Gelembung pengguna menjadi kuning, teks hitam
-                    isUser ? 'bg-yellow-400 text-black rounded-br-none' 
-                           // Gelembung AI tetap abu-abu gelap
-                           : 'bg-gray-800 text-gray-100 border border-gray-700 rounded-bl-none'
-                }`}
-            >
-                {isUser ? (
-                    <div className="text-black" style={{ whiteSpace: 'pre-wrap' }}>{content}</div>
-                ) : (
-                    // Teks AI di-invert agar putih
-                    <div className="prose prose-sm prose-invert max-w-none prose-table:w-full prose-table:border-collapse prose-tr:border-b prose-td:py-2 prose-td:px-3 prose-th:px-3 prose-a:text-blue-400 hover:prose-a:underline">
-                        <ReactMarkdown 
-                            remarkPlugins={[remarkGfm]} 
-                            rehypePlugins={[rehypeRaw]}
-                        >
-                            {content}
-                        </ReactMarkdown>
+return (
+        <div className={`flex flex-col mb-4 ${isUser ? 'items-end' : 'items-start'}`}>
+            <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+                {!isUser && (
+                    <div className="w-10 h-10 rounded-full bg-yellow-400 flex items-center justify-center mr-3 flex-shrink-0 shadow-md">
+                        <span className="text-black font-bold">AI</span>
                     </div>
                 )}
+                <div
+                    className={`max-w-xl p-4 rounded-lg shadow-md ${
+                        isUser ? 'bg-yellow-400 text-black rounded-br-none' 
+                               : 'bg-gray-800 text-gray-100 border border-gray-700 rounded-bl-none'
+                    }`}
+                >
+                    {isUser ? (
+                        <div className="text-black" style={{ whiteSpace: 'pre-wrap' }}>{content}</div>
+                    ) : (
+                        <div className="prose prose-sm prose-invert max-w-none">
+                            <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
+                                {content}
+                            </ReactMarkdown>
+                        </div>
+                    )}
+                </div>
             </div>
+
+            {/* AREA LIST OPSI KLIK (Hanya untuk Bot) */}
+            {!isUser && options && options.length > 0 && (
+                <div className="ml-14 mt-2 flex flex-col space-y-2 w-full max-w-md">
+                    <p className="text-xs text-gray-400 mb-1">Pilih data spesifik:</p>
+                    {options.map((opt, idx) => (
+                        <button
+                            key={idx}
+                            onClick={() => onOptionClick(opt.value)}
+                            className="text-left px-4 py-2 bg-gray-700 hover:bg-gray-600 text-sm text-white rounded-md border border-gray-600 transition-colors shadow-sm flex items-center justify-between group"
+                        >
+                            <span>{opt.label}</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                            </svg>
+                        </button>
+                    ))}
+                </div>
+            )}
         </div>
     );
 };
 
 
 // Komponen utama ChatWindow
-export default function ChatWindow({ conversation, onSendMessage, loading, onQuickResponse, quickReplies = [] }) {
+export default function ChatWindow({ conversation, onSendMessage, loading, onQuickResponse, quickReplies = [], onOptionClick }) {
     const [input, setInput] = useState('');
     const messagesEndRef = useRef(null);
 
@@ -138,7 +151,13 @@ export default function ChatWindow({ conversation, onSendMessage, loading, onQui
                         
                         {/* Tampilkan pesan-pesan */}
                         {conversation.messages?.map((msg, index) => (
-                            <Message key={msg.id || `msg-${index}`} sender={msg.sender} content={msg.content} />
+                            <Message 
+                            key={msg.id || `msg-${index}`} 
+                            sender={msg.sender} 
+                            content={msg.content} 
+                            options={msg.options} 
+                            onOptionClick={onOptionClick}
+                            />
                         ))}
 
                         {/* Loading saat AI sedang mengetik */}

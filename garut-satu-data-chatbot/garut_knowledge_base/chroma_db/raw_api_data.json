@@ -14,6 +14,302 @@
       },
       "distribution": [
         {
+          "title": "Jumlah Rukun Tetangga (RT) Per Desa di Kecamatan Talegong",
+          "mediaType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "format": ".xlsx",
+          "created_at": "2025-12-08T02:34:31.000000Z",
+          "updated_at": "2025-12-08T02:34:31.000000Z",
+          "downloadURL": "https://satudata-api.garutkab.go.id/storage/27204/Jumlah-Rukun-Tetangga-(RT)-Per-Desa-di-Kecamatan-Talegong---Tahun-2025.xlsx",
+          "accessURL": "https://satudata-api.garutkab.go.id/storage/27204/Jumlah-Rukun-Tetangga-(RT)-Per-Desa-di-Kecamatan-Talegong---Tahun-2025.xlsx",
+          "description": "Jumlah Rukun Tetangga (RT) Per Desa di Kecamatan Talegong"
+        }
+      ],
+      "identifier": "e84e548c-2c10-440a-b7d6-710478b2f833",
+      "issued": "2025-12-08T02:31:46.000000Z",
+      "modified": "2025-12-10T00:19:49.000000Z",
+      "accrualPeriodicity": "Tahunan",
+      "landingPage": "https://satudata.garutkab.go.id/data/jumlah-rukun-tetangga-rt-per-desa-di-kecamatan-talegong-5793",
+      "tahun": 2025,
+      "publisher": {
+        "@type": "org:Organization",
+        "name": "Kecamatan Talegong"
+      },
+      "title": "Jumlah Rukun Tetangga (RT) Per Desa di Kecamatan Talegong - Tahun 2025",
+      "description": "<p>Dataset ini berisi Data <i>Jumlah Rukun Tetangga (RT) Per Desa di Kecamatan Talegong - Tahun 2025</i></p><p>Penjelasan mengenai variabel di dalam Dataset ini sebagai berikut:</p><ul><li><strong>kode_kabupaten:</strong> menyatakan kode kabupaten sesuai ketentuan Kemendagri merujuk pada Peraturan Menteri dalam Negeri Nomor 58 Tahun 2021 Tentang Kode, Data Wilayah Administrasi Pemerintahan, dan Pulau dengan tipe data numerik.</li><li><strong>nama_kabupaten:</strong> menyatakan nama kabupaten sesuai penamaan Kemendagri merujuk pada Peraturan Menteri dalam Negeri Nomor 58 Tahun 2021 Tentang Kode, Data Wilayah Administrasi Pemerintahan, dan Pulau dengan tipe data teks.</li><li><strong>kode_kecamatan:</strong> menyatakan kode kecamatan sesuai ketentuan Kemendagri merujuk pada Peraturan Menteri dalam Negeri Nomor 58 Tahun 2021 Tentang Kode, Data Wilayah Administrasi Pemerintahan, dan Pulau dengan tipe data numerik.</li><li><strong>nama_kecamatan</strong>: menyatakan nama kecamatan sesuai penamaan Kemendagri merujuk pada Peraturan Menteri dalam Negeri Nomor 58 Tahun 2021 Tentang Kode, Data Wilayah Administrasi Pemerintahan, dan Pulau dengan tipe data teks.</li><li><strong>kode_desa_kelurahan</strong>: menyatakan kode desa/kelurahan sesuai ketentuan Kemendagri merujuk pada Peraturan Menteri dalam Negeri Nomor 58 Tahun 2021 Tentang Kode, Data Wilayah Administrasi Pemerintahan, dan Pulau dengan tipe data numerik.</li><li><strong>nama_desa_kelurahan</strong>: menyatakan nama desa/kelurahan sesuai penamaan Kemendagri merujuk pada Peraturan Menteri dalam Negeri Nomor 58 Tahun 2021 Tentang Kode, Data Wilayah Administrasi Pemerintahan, dan Pulau dengan tipe data teks.</li><li><strong>jumlah_rt</strong>: menyatakan jumlah RT berdasarkan nama desa/kelurahan di Kecamatan Talegong dengan tipe data numerik.</li><li><strong>satuan</strong>: menyatakan satuan dari data dengan tipe data teks.</li><li><strong>tahun</strong>: menyatakan tahun produksi data dengan tipe data numerik.</li></ul>",
+      "keyword": [
+        "Kecamatan Talegong",
+        "jawabarat",
+        "garut"
+      ]
+    },
+    {
+      "@type": "dcat:Distribution",
+      "accessLevel": "public",
+      "contactPoint": {
+        "fn": "Dinas Komunikasi dan Informatika",
+        "hasEmail": "diskominfo@garutkab.go.id"
+      },
+      "distribution": [
+        {
+          "title": "Jumlah Rukun Warga (RW) Per Desa di Kecamatan Talegong",
+          "mediaType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "format": ".xlsx",
+          "created_at": "2025-12-08T02:26:04.000000Z",
+          "updated_at": "2025-12-08T02:26:04.000000Z",
+          "downloadURL": "https://satudata-api.garutkab.go.id/storage/27200/Jumlah-Rukun-Warga-(RW)-Per-Desa-di-Kecamatan-Talegong---Tahun-2025.xlsx",
+          "accessURL": "https://satudata-api.garutkab.go.id/storage/27200/Jumlah-Rukun-Warga-(RW)-Per-Desa-di-Kecamatan-Talegong---Tahun-2025.xlsx",
+          "description": "Jumlah Rukun Warga (RW) Per Desa di Kecamatan Talegong"
+        }
+      ],
+      "identifier": "c79470b0-5a80-4828-b7ad-5c352689f05a",
+      "issued": "2025-12-08T02:23:17.000000Z",
+      "modified": "2025-12-10T00:15:21.000000Z",
+      "accrualPeriodicity": "Tahunan",
+      "landingPage": "https://satudata.garutkab.go.id/data/jumlah-rukun-warga-rw-per-desa-di-kecamatan-talegong-5788",
+      "tahun": 2025,
+      "publisher": {
+        "@type": "org:Organization",
+        "name": "Kecamatan Talegong"
+      },
+      "title": "Jumlah Rukun Warga (RW) Per Desa di Kecamatan Talegong - Tahun 2025",
+      "description": "<p>Dataset ini berisi Data <i>Jumlah Rukun Warga (RW) Per Desa di Kecamatan Talegong - Tahun 2025</i></p><p>Penjelasan mengenai variabel di dalam Dataset ini sebagai berikut:</p><ul><li><strong>kode_kabupaten:</strong> menyatakan kode kabupaten sesuai ketentuan Kemendagri merujuk pada Peraturan Menteri dalam Negeri Nomor 58 Tahun 2021 Tentang Kode, Data Wilayah Administrasi Pemerintahan, dan Pulau dengan tipe data numerik.</li><li><strong>nama_kabupaten:</strong> menyatakan nama kabupaten sesuai penamaan Kemendagri merujuk pada Peraturan Menteri dalam Negeri Nomor 58 Tahun 2021 Tentang Kode, Data Wilayah Administrasi Pemerintahan, dan Pulau dengan tipe data teks.</li><li><strong>kode_kecamatan:</strong> menyatakan kode kecamatan sesuai ketentuan Kemendagri merujuk pada Peraturan Menteri dalam Negeri Nomor 58 Tahun 2021 Tentang Kode, Data Wilayah Administrasi Pemerintahan, dan Pulau dengan tipe data numerik.</li><li><strong>nama_kecamatan</strong>: menyatakan nama kecamatan sesuai penamaan Kemendagri merujuk pada Peraturan Menteri dalam Negeri Nomor 58 Tahun 2021 Tentang Kode, Data Wilayah Administrasi Pemerintahan, dan Pulau dengan tipe data teks.</li><li><strong>kode_desa_kelurahan</strong>: menyatakan kode desa/kelurahan sesuai ketentuan Kemendagri merujuk pada Peraturan Menteri dalam Negeri Nomor 58 Tahun 2021 Tentang Kode, Data Wilayah Administrasi Pemerintahan, dan Pulau dengan tipe data numerik.</li><li><strong>nama_desa_kelurahan</strong>: menyatakan nama desa/kelurahan sesuai penamaan Kemendagri merujuk pada Peraturan Menteri dalam Negeri Nomor 58 Tahun 2021 Tentang Kode, Data Wilayah Administrasi Pemerintahan, dan Pulau dengan tipe data teks.</li><li><strong>jumlah_rw</strong>: menyatakan jumlah RW berdasarkan nama desa/kelurahan di Kecamatan Talegong dengan tipe data numerik.</li><li><strong>satuan</strong>: menyatakan satuan dari data dengan tipe data teks.</li><li><strong>tahun</strong>: menyatakan tahun produksi data dengan tipe data numerik.</li></ul>",
+      "keyword": [
+        "Kecamatan Talegong",
+        "jawabarat",
+        "garut"
+      ]
+    },
+    {
+      "@type": "dcat:Distribution",
+      "accessLevel": "public",
+      "contactPoint": {
+        "fn": "Dinas Komunikasi dan Informatika",
+        "hasEmail": "diskominfo@garutkab.go.id"
+      },
+      "distribution": [
+        {
+          "title": "Jumlah Penduduk Per Desa di Kecamatan Talegong",
+          "mediaType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "format": ".xlsx",
+          "created_at": "2025-12-08T01:59:24.000000Z",
+          "updated_at": "2025-12-10T02:09:29.000000Z",
+          "downloadURL": "https://satudata-api.garutkab.go.id/storage/27206/Jumlah-Penduduk-Per-Desa-di-Kecamatan-Talegong---Tahun-2025.xlsx",
+          "accessURL": "https://satudata-api.garutkab.go.id/storage/27206/Jumlah-Penduduk-Per-Desa-di-Kecamatan-Talegong---Tahun-2025.xlsx",
+          "description": "Jumlah Penduduk Per Desa di Kecamatan Talegong"
+        }
+      ],
+      "identifier": "98e3000b-aba3-4b68-8f5d-5c4b49d611b4",
+      "issued": "2025-12-08T02:06:08.000000Z",
+      "modified": "2025-12-11T02:25:04.000000Z",
+      "accrualPeriodicity": "Tahunan",
+      "landingPage": "https://satudata.garutkab.go.id/data/jumlah-penduduk-per-desa-di-kecamatan-talegong-5787",
+      "tahun": 2025,
+      "publisher": {
+        "@type": "org:Organization",
+        "name": "Kecamatan Talegong"
+      },
+      "title": "Jumlah Penduduk Per Desa di Kecamatan Talegong - Tahun 2025",
+      "description": "<p>Dataset ini berisi Data <i>Jumlah Penduduk Per Desa di Kecamatan Talegong - Tahun 2025</i></p><p>Penjelasan mengenai variabel di dalam Dataset ini sebagai berikut:</p><ul><li><strong>kode_kabupaten:</strong> menyatakan kode kabupaten sesuai ketentuan Kemendagri merujuk pada Peraturan Menteri dalam Negeri Nomor 58 Tahun 2021 Tentang Kode, Data Wilayah Administrasi Pemerintahan, dan Pulau dengan tipe data numerik.</li><li><strong>nama_kabupaten:</strong> menyatakan nama kabupaten sesuai penamaan Kemendagri merujuk pada Peraturan Menteri dalam Negeri Nomor 58 Tahun 2021 Tentang Kode, Data Wilayah Administrasi Pemerintahan, dan Pulau dengan tipe data teks.</li><li><strong>kode_kecamatan:</strong> menyatakan kode kecamatan sesuai ketentuan Kemendagri merujuk pada Peraturan Menteri dalam Negeri Nomor 58 Tahun 2021 Tentang Kode, Data Wilayah Administrasi Pemerintahan, dan Pulau dengan tipe data numerik.</li><li><strong>nama_kecamatan</strong>: menyatakan nama kecamatan sesuai penamaan Kemendagri merujuk pada Peraturan Menteri dalam Negeri Nomor 58 Tahun 2021 Tentang Kode, Data Wilayah Administrasi Pemerintahan, dan Pulau dengan tipe data teks.</li><li><strong>kode_desa_kelurahan</strong>: menyatakan kode desa/kelurahan sesuai ketentuan Kemendagri merujuk pada Peraturan Menteri dalam Negeri Nomor 58 Tahun 2021 Tentang Kode, Data Wilayah Administrasi Pemerintahan, dan Pulau dengan tipe data numerik.</li><li><strong>nama_desa_kelurahan</strong>: menyatakan nama desa/kelurahan sesuai penamaan Kemendagri merujuk pada Peraturan Menteri dalam Negeri Nomor 58 Tahun 2021 Tentang Kode, Data Wilayah Administrasi Pemerintahan, dan Pulau dengan tipe data teks.</li><li><strong>jenis_kelamin</strong>: menyatakan jenis kelamin penduduk dengan tipe data teks.</li><li><strong>jumlah_penduduk</strong>: menyatakan jumlah penduduk berdasarkan jenis kelamin dan nama desa/kelurahan di Kecamatan Talegong dengan tipe data numerik.</li><li><strong>satuan</strong>: menyatakan satuan dari data dengan tipe data teks.</li><li><strong>tahun</strong>: menyatakan tahun produksi data dengan tipe data numerik.</li></ul>",
+      "keyword": [
+        "Kecamatan Talegong",
+        "jawabarat",
+        "garut"
+      ]
+    },
+    {
+      "@type": "dcat:Distribution",
+      "accessLevel": "public",
+      "contactPoint": {
+        "fn": "Dinas Komunikasi dan Informatika",
+        "hasEmail": "diskominfo@garutkab.go.id"
+      },
+      "distribution": [
+        {
+          "title": "Jumlah Kunjungan Wisatawan di Kabupaten Garut",
+          "mediaType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "format": ".xlsx",
+          "created_at": "2025-12-05T04:33:59.000000Z",
+          "updated_at": "2025-12-05T04:33:59.000000Z",
+          "downloadURL": "https://satudata-api.garutkab.go.id/storage/27195/2025_november_jumlah_kunjungan_wisatawan.xlsx",
+          "accessURL": "https://satudata-api.garutkab.go.id/storage/27195/2025_november_jumlah_kunjungan_wisatawan.xlsx",
+          "description": "Jumlah Kunjungan Wisatawan di Kabupaten Garut"
+        }
+      ],
+      "identifier": "679bc7f5-c31a-4a73-aec4-88cb53acc441",
+      "issued": "2025-12-05T04:33:35.000000Z",
+      "modified": "2025-12-05T05:43:02.000000Z",
+      "accrualPeriodicity": "Bulanan",
+      "landingPage": "https://satudata.garutkab.go.id/data/jumlah-kunjungan-wisatawan-di-kabupaten-garut-5786",
+      "tahun": 2025,
+      "publisher": {
+        "@type": "org:Organization",
+        "name": "Dinas Pariwisata dan Kebudayaan"
+      },
+      "title": "Jumlah Kunjungan Wisatawan di Kabupaten Garut - Bulan November Tahun 2025",
+      "description": "<p>Dataset ini berisi Data <i>Jumlah Kunjungan Wisatawan di Kabupaten Garut - Bulan November Tahun 2025</i></p><p>Penjelasan mengenai variabel di dalam Dataset ini sebagai berikut:</p><ul><li><strong>kode_kabupaten:</strong> menyatakan kode kabupaten sesuai ketentuan Kemendagri merujuk pada Peraturan Menteri dalam Negeri Nomor 58 Tahun 2021 Tentang Kode, Data Wilayah Administrasi Pemerintahan, dan Pulau dengan tipe data numerik.</li><li><strong>nama_kabupaten:</strong> menyatakan nama kabupaten sesuai penamaan Kemendagri merujuk pada Peraturan Menteri dalam Negeri Nomor 58 Tahun 2021 Tentang Kode, Data Wilayah Administrasi Pemerintahan, dan Pulau dengan tipe data teks.</li><li><strong>nama_tempat_wisata:</strong> menyatakan nama tempat wisata yang ada di Kabupaten Garut dengan tipe data teks.</li><li><strong>jenis_wisatawan: </strong>menyatakan jenis wisatawan yang melakukan kunjungan ke tempat wisata di Kabupaten Garut dengan tipe data teks.</li><li><strong>jumlah_kunjungan:</strong> menyatakan jumlah kunjungan wisatawan berdasarkan jenis wisatawan dengan tipe data numerik.</li><li><strong>satuan:</strong> menyatakan satuan dari data dalam Kunjungan dengan tipe data teks.</li><li><strong>bulan: </strong>menyatakan nama bulan dari kunjungan wisatawan ke tempat wisata di Kabupaten Garut dengan tipe data teks.</li><li><strong>tahun:</strong> menyatakan tahun produksi data dengan tipe data numerik.</li></ul>",
+      "keyword": [
+        "Dinas Pariwisata dan Kebudayaan",
+        "jawabarat",
+        "garut"
+      ]
+    },
+    {
+      "@type": "dcat:Distribution",
+      "accessLevel": "public",
+      "contactPoint": {
+        "fn": "Dinas Komunikasi dan Informatika",
+        "hasEmail": "diskominfo@garutkab.go.id"
+      },
+      "distribution": [
+        {
+          "title": "Jumlah Kunjungan Wisatawan di Kabupaten Garut",
+          "mediaType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "format": ".xlsx",
+          "created_at": "2025-12-05T04:32:58.000000Z",
+          "updated_at": "2025-12-05T04:32:59.000000Z",
+          "downloadURL": "https://satudata-api.garutkab.go.id/storage/27189/2025_oktober_jumlah_kunjungan_wisatawan.xlsx",
+          "accessURL": "https://satudata-api.garutkab.go.id/storage/27189/2025_oktober_jumlah_kunjungan_wisatawan.xlsx",
+          "description": "Jumlah Kunjungan Wisatawan di Kabupaten Garut"
+        }
+      ],
+      "identifier": "b1bdc224-e1e1-43bd-aebe-98f9075ee8d2",
+      "issued": "2025-12-05T04:32:20.000000Z",
+      "modified": "2025-12-05T04:32:20.000000Z",
+      "accrualPeriodicity": "Bulanan",
+      "landingPage": "https://satudata.garutkab.go.id/data/jumlah-kunjungan-wisatawan-di-kabupaten-garut-5785",
+      "tahun": 2025,
+      "publisher": {
+        "@type": "org:Organization",
+        "name": "Dinas Pariwisata dan Kebudayaan"
+      },
+      "title": "Jumlah Kunjungan Wisatawan di Kabupaten Garut - Bulan Oktober Tahun 2025",
+      "description": "<p>Dataset ini berisi Data <i>Jumlah Kunjungan Wisatawan di Kabupaten Garut - Bulan Oktober Tahun 2025</i></p><p>Penjelasan mengenai variabel di dalam Dataset ini sebagai berikut:</p><ul><li><strong>kode_kabupaten:</strong> menyatakan kode kabupaten sesuai ketentuan Kemendagri merujuk pada Peraturan Menteri dalam Negeri Nomor 58 Tahun 2021 Tentang Kode, Data Wilayah Administrasi Pemerintahan, dan Pulau dengan tipe data numerik.</li><li><strong>nama_kabupaten:</strong> menyatakan nama kabupaten sesuai penamaan Kemendagri merujuk pada Peraturan Menteri dalam Negeri Nomor 58 Tahun 2021 Tentang Kode, Data Wilayah Administrasi Pemerintahan, dan Pulau dengan tipe data teks.</li><li><strong>nama_tempat_wisata:</strong> menyatakan nama tempat wisata yang ada di Kabupaten Garut dengan tipe data teks.</li><li><strong>jenis_wisatawan: </strong>menyatakan jenis wisatawan yang melakukan kunjungan ke tempat wisata di Kabupaten Garut dengan tipe data teks.</li><li><strong>jumlah_kunjungan:</strong> menyatakan jumlah kunjungan wisatawan berdasarkan jenis wisatawan dengan tipe data numerik.</li><li><strong>satuan:</strong> menyatakan satuan dari data dalam Kunjungan dengan tipe data teks.</li><li><strong>bulan: </strong>menyatakan nama bulan dari kunjungan wisatawan ke tempat wisata di Kabupaten Garut dengan tipe data teks.</li><li><strong>tahun:</strong> menyatakan tahun produksi data dengan tipe data numerik.</li></ul>",
+      "keyword": [
+        "Dinas Pariwisata dan Kebudayaan",
+        "jawabarat",
+        "garut"
+      ]
+    },
+    {
+      "@type": "dcat:Distribution",
+      "accessLevel": "public",
+      "contactPoint": {
+        "fn": "Dinas Komunikasi dan Informatika",
+        "hasEmail": "diskominfo@garutkab.go.id"
+      },
+      "distribution": [
+        {
+          "title": "Jumlah Kunjungan Wisatawan di Kabupaten Garut",
+          "mediaType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "format": ".xlsx",
+          "created_at": "2025-12-05T03:01:14.000000Z",
+          "updated_at": "2025-12-05T04:35:36.000000Z",
+          "downloadURL": "https://satudata-api.garutkab.go.id/storage/27193/2025_september_jumlah_kunjungan_wisatawan.xlsx",
+          "accessURL": "https://satudata-api.garutkab.go.id/storage/27193/2025_september_jumlah_kunjungan_wisatawan.xlsx",
+          "description": "Jumlah Kunjungan Wisatawan di Kabupaten Garut"
+        }
+      ],
+      "identifier": "89954f08-dc70-496c-98ea-5c38aaa93adc",
+      "issued": "2025-12-05T03:00:27.000000Z",
+      "modified": "2025-12-05T03:00:27.000000Z",
+      "accrualPeriodicity": "Bulanan",
+      "landingPage": "https://satudata.garutkab.go.id/data/jumlah-kunjungan-wisatawan-di-kabupaten-garut-5784",
+      "tahun": 2025,
+      "publisher": {
+        "@type": "org:Organization",
+        "name": "Dinas Pariwisata dan Kebudayaan"
+      },
+      "title": "Jumlah Kunjungan Wisatawan di Kabupaten Garut - Bulan September Tahun 2025",
+      "description": "<p>Dataset ini berisi Data <i>Jumlah Kunjungan Wisatawan di Kabupaten Garut - Bulan September Tahun 2025</i></p><p>Penjelasan mengenai variabel di dalam Dataset ini sebagai berikut:</p><ul><li><strong>kode_kabupaten:</strong> menyatakan kode kabupaten sesuai ketentuan Kemendagri merujuk pada Peraturan Menteri dalam Negeri Nomor 58 Tahun 2021 Tentang Kode, Data Wilayah Administrasi Pemerintahan, dan Pulau dengan tipe data numerik.</li><li><strong>nama_kabupaten:</strong> menyatakan nama kabupaten sesuai penamaan Kemendagri merujuk pada Peraturan Menteri dalam Negeri Nomor 58 Tahun 2021 Tentang Kode, Data Wilayah Administrasi Pemerintahan, dan Pulau dengan tipe data teks.</li><li><strong>nama_tempat_wisata:</strong> menyatakan nama tempat wisata yang ada di Kabupaten Garut dengan tipe data teks.</li><li><strong>jenis_wisatawan: </strong>menyatakan jenis wisatawan yang melakukan kunjungan ke tempat wisata di Kabupaten Garut dengan tipe data teks.</li><li><strong>jumlah_kunjungan:</strong> menyatakan jumlah kunjungan wisatawan berdasarkan jenis wisatawan dengan tipe data numerik.</li><li><strong>satuan:</strong> menyatakan satuan dari data dalam Kunjungan dengan tipe data teks.</li><li><strong>bulan: </strong>menyatakan nama bulan dari kunjungan wisatawan ke tempat wisata di Kabupaten Garut dengan tipe data teks.</li><li><strong>tahun:</strong> menyatakan tahun produksi data dengan tipe data numerik.</li></ul>",
+      "keyword": [
+        "Dinas Pariwisata dan Kebudayaan",
+        "jawabarat",
+        "garut"
+      ]
+    },
+    {
+      "@type": "dcat:Distribution",
+      "accessLevel": "public",
+      "contactPoint": {
+        "fn": "Dinas Komunikasi dan Informatika",
+        "hasEmail": "diskominfo@garutkab.go.id"
+      },
+      "distribution": [
+        {
+          "title": "Jumlah Kendaraan yang Melakukan Uji Kendaraan (KIR) di Kabupaten Garut",
+          "mediaType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "format": ".xlsx",
+          "created_at": "2025-11-27T02:54:40.000000Z",
+          "updated_at": "2025-11-27T02:54:41.000000Z",
+          "downloadURL": "https://satudata-api.garutkab.go.id/storage/27171/list_data_template_kir.xlsx",
+          "accessURL": "https://satudata-api.garutkab.go.id/storage/27171/list_data_template_kir.xlsx",
+          "description": "Jumlah Kendaraan yang Melakukan Uji Kendaraan (KIR) di Kabupaten Garut"
+        }
+      ],
+      "identifier": "2e3783ee-c02a-4305-bde8-e7a5ab2ac7ff",
+      "issued": "2025-11-27T02:54:40.000000Z",
+      "modified": "2025-12-15T03:28:46.000000Z",
+      "accrualPeriodicity": "Tahunan",
+      "landingPage": "https://satudata.garutkab.go.id/data/jumlah-kendaraan-yang-melakukan-uji-kendaraan-kir-di-kabupaten-garut-5769",
+      "tahun": 2025,
+      "publisher": {
+        "@type": "org:Organization",
+        "name": "Dinas Perhubungan"
+      },
+      "title": "Jumlah Kendaraan yang Melakukan Uji Kendaraan (KIR) di Kabupaten Garut - Tahun 2025",
+      "description": "<p>Dataset ini berisi Data <i>Jumlah Kendaraan yang Melakukan Uji Kendaraan (KIR) di Kabupaten Garut</i></p><p>Penjelasan mengenai variabel di dalam Dataset ini sebagai berikut:</p><ul><li><strong>kode_kabupaten:</strong> menyatakan kode kabupaten sesuai ketentuan Kemendagri merujuk pada Peraturan Menteri dalam Negeri Nomor 58 Tahun 2021 Tentang Kode, Data Wilayah Administrasi Pemerintahan, dan Pulau dengan tipe data numerik.</li>                                              <li><strong>nama_kabupaten:</strong> menyatakan nama kabupaten sesuai penamaan Kemendagri merujuk pada Peraturan Menteri dalam Negeri Nomor 58 Tahun 2021 Tentang Kode, Data Wilayah Administrasi Pemerintahan, dan Pulau dengan tipe data teks.</li><li><strong>tahun </strong>: menyatakan tahun produksi data dengan tipe data numerik</li><li><strong>bulan </strong>: menyatakan bulan produksi data dengan tipe data numerik</li><li><strong>jenis_permohonan </strong>: menyatakan Jenis Permohonan produksi data dengan tipe data teks.</li><li><strong>jumlah </strong>: menyatakan jumlah data dengan tipe data numerik</li><li><strong>satuan&nbsp;</strong>: menyatakan satuan dari data dalam unit dengan tipe data teks.</li></ul>",
+      "keyword": [
+        "Dinas Perhubungan",
+        "jawabarat",
+        "garut"
+      ]
+    },
+    {
+      "@type": "dcat:Distribution",
+      "accessLevel": "public",
+      "contactPoint": {
+        "fn": "Dinas Komunikasi dan Informatika",
+        "hasEmail": "diskominfo@garutkab.go.id"
+      },
+      "distribution": [
+        {
+          "title": "Jumlah Rukun Tetangga (RT) Per Desa di Kecamatan Cibiuk",
+          "mediaType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "format": ".xlsx",
+          "created_at": "2025-11-26T05:00:53.000000Z",
+          "updated_at": "2025-11-26T05:00:53.000000Z",
+          "downloadURL": "https://satudata-api.garutkab.go.id/storage/27184/template_jumlah-rt-per-desa.xlsx",
+          "accessURL": "https://satudata-api.garutkab.go.id/storage/27184/template_jumlah-rt-per-desa.xlsx",
+          "description": "Jumlah Rukun Tetangga (RT) Per Desa di Kecamatan Cibiuk"
+        }
+      ],
+      "identifier": "17e261b3-061f-4ee4-8aa5-5be6e8edd354",
+      "issued": "2025-11-26T05:00:51.000000Z",
+      "modified": "2025-12-10T00:13:06.000000Z",
+      "accrualPeriodicity": "Tahunan",
+      "landingPage": "https://satudata.garutkab.go.id/data/jumlah-rukun-tetangga-rt-per-desa-di-kecamatan-cibiuk-5768",
+      "tahun": 2025,
+      "publisher": {
+        "@type": "org:Organization",
+        "name": "Kecamatan Cibiuk"
+      },
+      "title": "Jumlah Rukun Tetangga (RT) Per Desa di Kecamatan Cibiuk - Tahun 2025",
+      "description": "<p>Dataset ini berisi Data <i>Jumlah Rukun Tetangga (RT) Per Desa di Kecamatan Cibiuk - Tahun 2025</i></p><p>Penjelasan mengenai variabel di dalam Dataset ini sebagai berikut:</p><ul><li><strong>kode_kabupaten:</strong> menyatakan kode kabupaten sesuai ketentuan Kemendagri merujuk pada Peraturan Menteri dalam Negeri Nomor 58 Tahun 2021 Tentang Kode, Data Wilayah Administrasi Pemerintahan, dan Pulau dengan tipe data numerik.</li><li><strong>nama_kabupaten:</strong> menyatakan nama kabupaten sesuai penamaan Kemendagri merujuk pada Peraturan Menteri dalam Negeri Nomor 58 Tahun 2021 Tentang Kode, Data Wilayah Administrasi Pemerintahan, dan Pulau dengan tipe data teks.</li><li><strong>kode_kecamatan:</strong> menyatakan kode kecamatan sesuai ketentuan Kemendagri merujuk pada Peraturan Menteri dalam Negeri Nomor 58 Tahun 2021 Tentang Kode, Data Wilayah Administrasi Pemerintahan, dan Pulau dengan tipe data numerik.</li><li><strong>nama_kecamatan</strong>: menyatakan nama kecamatan sesuai penamaan Kemendagri merujuk pada Peraturan Menteri dalam Negeri Nomor 58 Tahun 2021 Tentang Kode, Data Wilayah Administrasi Pemerintahan, dan Pulau dengan tipe data teks.</li><li><strong>kode_desa_kelurahan</strong>: menyatakan kode desa/kelurahan sesuai ketentuan Kemendagri merujuk pada Peraturan Menteri dalam Negeri Nomor 58 Tahun 2021 Tentang Kode, Data Wilayah Administrasi Pemerintahan, dan Pulau dengan tipe data numerik.</li><li><strong>nama_desa_kelurahan</strong>: menyatakan nama desa/kelurahan sesuai penamaan Kemendagri merujuk pada Peraturan Menteri dalam Negeri Nomor 58 Tahun 2021 Tentang Kode, Data Wilayah Administrasi Pemerintahan, dan Pulau dengan tipe data teks.</li><li><strong>jumlah_rt</strong>: menyatakan jumlah RT berdasarkan nama desa/kelurahan di Kecamatan Cibiuk dengan tipe data numerik.</li><li><strong>satuan</strong>: menyatakan satuan dari data dengan tipe data teks.</li><li><strong>tahun</strong>: menyatakan tahun produksi data dengan tipe data numerik.</li></ul>",
+      "keyword": [
+        "Kecamatan Cibiuk",
+        "jawabarat",
+        "garut"
+      ]
+    },
+    {
+      "@type": "dcat:Distribution",
+      "accessLevel": "public",
+      "contactPoint": {
+        "fn": "Dinas Komunikasi dan Informatika",
+        "hasEmail": "diskominfo@garutkab.go.id"
+      },
+      "distribution": [
+        {
           "title": "Jumlah Rukun Tetangga (RT) Per Desa di Kecamatan Karangpawitan",
           "mediaType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
           "format": ".xlsx",
@@ -21182,9 +21478,9 @@
           "mediaType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
           "format": ".xlsx",
           "created_at": "2025-09-11T03:01:14.000000Z",
-          "updated_at": "2025-09-11T03:01:15.000000Z",
-          "downloadURL": "https://satudata-api.garutkab.go.id/storage/25980/2025_agustus_jumlah_kunjungan_wisatawan.xlsx",
-          "accessURL": "https://satudata-api.garutkab.go.id/storage/25980/2025_agustus_jumlah_kunjungan_wisatawan.xlsx",
+          "updated_at": "2025-12-05T04:35:15.000000Z",
+          "downloadURL": "https://satudata-api.garutkab.go.id/storage/27192/2025_agustus_jumlah_kunjungan_wisatawan.xlsx",
+          "accessURL": "https://satudata-api.garutkab.go.id/storage/27192/2025_agustus_jumlah_kunjungan_wisatawan.xlsx",
           "description": "Jumlah Kunjungan Wisatawan di Kabupaten Garut"
         }
       ],
@@ -21219,9 +21515,9 @@
           "mediaType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
           "format": ".xlsx",
           "created_at": "2025-09-11T02:55:30.000000Z",
-          "updated_at": "2025-09-11T02:58:43.000000Z",
-          "downloadURL": "https://satudata-api.garutkab.go.id/storage/25979/2025_juli_jumlah_kunjungan_wisatawan.xlsx",
-          "accessURL": "https://satudata-api.garutkab.go.id/storage/25979/2025_juli_jumlah_kunjungan_wisatawan.xlsx",
+          "updated_at": "2025-12-05T04:34:57.000000Z",
+          "downloadURL": "https://satudata-api.garutkab.go.id/storage/27191/2025_juli_jumlah_kunjungan_wisatawan.xlsx",
+          "accessURL": "https://satudata-api.garutkab.go.id/storage/27191/2025_juli_jumlah_kunjungan_wisatawan.xlsx",
           "description": "Jumlah Kunjungan Wisatawan di Kabupaten Garut"
         }
       ],
@@ -26917,9 +27213,9 @@
           "mediaType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
           "format": ".xlsx",
           "created_at": "2025-07-30T03:11:10.000000Z",
-          "updated_at": "2025-09-11T02:58:30.000000Z",
-          "downloadURL": "https://satudata-api.garutkab.go.id/storage/25978/2025_juni_jumlah_kunjungan_wisatawan.xlsx",
-          "accessURL": "https://satudata-api.garutkab.go.id/storage/25978/2025_juni_jumlah_kunjungan_wisatawan.xlsx",
+          "updated_at": "2025-12-05T04:31:18.000000Z",
+          "downloadURL": "https://satudata-api.garutkab.go.id/storage/27188/2025_juni_jumlah_kunjungan_wisatawan.xlsx",
+          "accessURL": "https://satudata-api.garutkab.go.id/storage/27188/2025_juni_jumlah_kunjungan_wisatawan.xlsx",
           "description": "Jumlah Kunjungan Wisatawan di Kabupaten Garut"
         }
       ],

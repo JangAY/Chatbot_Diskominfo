@@ -2,39 +2,81 @@ import json
 import logging
 import pandas as pd
 import requests
+import time
 from io import BytesIO
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from garut_knowledge_base.config import API_BASE, RAW_API_PATH, KNOWLEDGE_PATH
 
 log = logging.getLogger("build_knowledge_base")
 
+# ====================================================================
+#  CONFIGURE SESSION WITH RETRIES
+# ====================================================================
+def get_retry_session(retries=3, backoff_factor=1, status_forcelist=(500, 502, 504)):
+    """
+    Creates a requests session that retries on connection errors and timeouts.
+    """
+    session = requests.Session()
+    retry = Retry(
+        total=retries,
+        read=retries,
+        connect=retries,
+        backoff_factor=backoff_factor,
+        status_forcelist=status_forcelist,
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount('http://', adapter)
+    session.mount('https://', adapter)
+    return session
 
 # ====================================================================
 #  LOAD DATASET FILE
 # ====================================================================
 def load_dataset_file(download_url: str, title: str):
     """
-    Load dataset dari URL:
-    - Skip HTML
-    - CSV
-    - XLSX (.xlsx)
-    - XLS  (97-2003)
+    Load dataset from URL with robust error handling and retries.
     """
+    if not download_url:
+        return None
+
+    # Skip known invalid extensions or likely web pages to save time
+    if download_url.endswith(('.php', '.html', '.htm')):
+         print(f"⏩ Skipping likely HTML URL for: {title}")
+         return None
+
+    session = get_retry_session()
+    
     try:
-        r = requests.get(download_url, timeout=15)
+        # Increase timeout to 45 seconds
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        }
+        r = session.get(download_url, timeout=45, headers=headers)
+        
+        # Check content type header before reading content
+        content_type = r.headers.get('Content-Type', '').lower()
+        if 'text/html' in content_type:
+             print(f"⚠️ HTML content detected in header for: {title} ({download_url})")
+             return None
+             
         file_data = r.content
 
-        # HTML → skip
-        if file_data.strip().startswith(b"<") or b"html" in file_data[:200].lower():
-            print(f"⚠️ File HTML, bukan dataset: {title}")
-            raise ValueError("HTML content returned, not a dataset")
+        # Double check content for HTML tags
+        if file_data.strip().startswith(b"<") or b"<html" in file_data[:500].lower():
+            print(f"⚠️ Body contains HTML, not dataset: {title}")
+            return None
 
         header = file_data[:8]
 
         # CSV autodetect
-        if download_url.endswith(".csv") or (b"," in file_data[:200] and b"\n" in file_data[:200]):
-            return pd.read_csv(BytesIO(file_data))
+        if download_url.endswith(".csv") or (b"," in file_data[:500] and b"\n" in file_data[:500]):
+            try:
+                return pd.read_csv(BytesIO(file_data), on_bad_lines='skip')
+            except Exception as csv_e:
+                 print(f"⚠️ CSV parsing failed for {title}: {csv_e}")
 
-        # XLSX (ZIP → PK header)
+        # XLSX (ZIP -> PK header)
         if header[:2] == b"PK":
             return pd.read_excel(BytesIO(file_data), engine="openpyxl")
 
@@ -42,11 +84,22 @@ def load_dataset_file(download_url: str, title: str):
         if header == b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1":
             return pd.read_excel(BytesIO(file_data), engine="xlrd")
 
-        print(f"⚠️ Format tidak dikenali: {title} | Header: {header}")
-        raise ValueError("Unknown file format")
+        # Fallback for text files that might be CSVs without extension
+        try:
+             # Try reading as csv one last time if size suggests it's data
+             if len(file_data) > 0:
+                return pd.read_csv(BytesIO(file_data), on_bad_lines='skip')
+        except:
+            pass
 
+        print(f"⚠️ Format tidak dikenali: {title} | Header: {header[:10]}")
+        return None
+
+    except requests.exceptions.ReadTimeout:
+        print(f"❌ Timeout giving up on: {title}")
+        return None
     except Exception as e:
-        print(f"Failed to parse dataset: {title}", e)
+        print(f"❌ Failed to parse dataset: {title}", e)
         return None
 
 
@@ -56,17 +109,16 @@ def load_dataset_file(download_url: str, title: str):
 def compact_rows(df: pd.DataFrame, max_rows: int = 200):
     """
     Merapikan isi dataset menjadi embedding-friendly text.
-    Truncate ke 200 baris agar aman.
     """
     if df is None or df.empty:
         return ""
 
-    # Limit jumlah row agar embedding tidak terlalu besar
     if len(df) > max_rows:
         df = df.head(max_rows)
 
     result = []
     for _, row in df.iterrows():
+        # Convert all to string and handle NaN
         clean_row = {str(k): ("" if pd.isna(v) else str(v)) for k, v in row.items()}
         result.append(clean_row)
 
@@ -91,14 +143,16 @@ def build_from_raw(raw: dict) -> dict:
     if not isinstance(datasets, list):
         log.error("Invalid dataset format")
         return res
+    
+    total = len(datasets)
+    print(f"🔍 Found {total} datasets. Starting processing...")
 
-    for d in datasets:
+    for i, d in enumerate(datasets):
         try:
             title = d.get("title")
             description = d.get("description")
             tahun = d.get("tahun")
             landing_page = d.get("landingPage")
-
             publisher = d.get("publisher", {}).get("name") if isinstance(d.get("publisher"), dict) else None
 
             # Prefer schema baru
@@ -110,6 +164,10 @@ def build_from_raw(raw: dict) -> dict:
                 if dist_list:
                     dist = dist_list[0]
                     download_url = dist.get("downloadURL") or dist.get("accessURL")
+            
+            # Progress marker
+            if i % 10 == 0:
+                print(f"⏳ Processing {i}/{total}: {title}")
 
             # -----------------------------------------
             # LOAD DATA FRAME
@@ -120,13 +178,15 @@ def build_from_raw(raw: dict) -> dict:
             all_rows_compacted = ""
 
             if download_url:
+                # Add a small delay to be polite to the server and avoid rate limits
+                time.sleep(0.5) 
                 df = load_dataset_file(download_url, title)
 
-                if isinstance(df, pd.DataFrame):
+                if isinstance(df, pd.DataFrame) and not df.empty:
+                    # Clean column names (strip whitespace)
+                    df.columns = df.columns.astype(str).str.strip()
                     columns = list(df.columns)
                     sample_rows = df.head(5).to_dict(orient="records")
-
-                    # NEW: bawa isi dataset untuk embedding
                     all_rows_compacted = compact_rows(df)
 
             # -----------------------------------------
@@ -139,18 +199,15 @@ def build_from_raw(raw: dict) -> dict:
                 "description": description,
                 "landing_page": landing_page,
                 "download_url": download_url,
-
                 "columns": columns,
                 "sample": sample_rows,
-
-                # NEW
                 "rows": all_rows_compacted,
             }
 
             res["kumpulan_dataset"].append(kb_item)
 
         except Exception as e:
-            print("Error parsing dataset:", e)
+            print(f"Error processing item {i}: {e}")
             continue
 
     KNOWLEDGE_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -168,18 +225,13 @@ def build_knowledge_base():
         print("ERROR: raw_api_data.json not found — run fetch_api_data.py")
         return None
 
-
-# ====================================================================
-#  BUILD EMBEDDING TEXT (VERSI FINAL)
-# ====================================================================
+# Keep the build_embedding_text function if it's imported elsewhere, 
+# but it is not strictly used inside this file's main execution flow.
 def build_embedding_text(item):
-    """Teks embedding super lengkap agar pertanyaan numerik bisa dijawab."""
-
     title = item.get("title", "")
     desc = item.get("description", "")
     tahun = item.get("tahun", "")
     publisher = item.get("publisher", "")
-
     columns_text = ", ".join(item.get("columns", []))
     sample_text = json.dumps(item.get("sample", []), ensure_ascii=False)
     rows_text = item.get("rows", "")
@@ -201,7 +253,6 @@ Contoh Baris Pertama:
 Isi Dataset (diringkas):
 {rows_text}
 """
-
 
 if __name__ == "__main__":
     build_knowledge_base()
