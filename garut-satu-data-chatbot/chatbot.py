@@ -8,6 +8,7 @@ import time
 import traceback
 from typing import Optional, List, Dict, Any, Tuple
 
+import difflib
 import logging
 import requests
 import chromadb
@@ -74,6 +75,98 @@ except Exception as e:
     log.exception("[GEMINI] failed to init generation_model: %s", e)
     generation_model = None
 
+
+# =====================================================
+# TAMBAHAN: Synonym Dictionary (Kamus Sinonim)
+# =====================================================
+# Ini membantu mencocokkan "Miskin" dengan "Kemiskinan", "Harga" dengan "Tarif", dll.
+# ... (Imports dan Setup Log sama)
+
+# =====================================================
+# MODIFIKASI: Synonym & Stopwords
+# =====================================================
+SYNONYMS = {
+    "miskin": ["kemiskinan", "prasejahtera", "pkh", "bdt", "sosial"],
+    "penduduk": ["warga", "masyarakat", "populasi", "orang", "kependudukan"],
+    "harga": ["tarif", "biaya", "nilai"],
+    "sekolah": ["pendidikan", "sd", "smp", "sma", "smk", "madrasah", "belajar"],
+    "kesehatan": ["puskesmas", "rsud", "sakit", "medis", "nakes"],
+    "kecamatan": ["wilayah", "daerah"],
+    "stunting": ["gizi", "buruk", "balita", "tumbuh", "kembang"]
+}
+
+def expand_keywords(query_words: List[str]) -> set:
+    expanded = set(query_words)
+    for word in query_words:
+        # Cek sebagai Key
+        if word in SYNONYMS:
+            expanded.update(SYNONYMS[word])
+        # Cek sebagai Value (Reverse lookup sederhana)
+        for key, val_list in SYNONYMS.items():
+            if word in val_list:
+                expanded.add(key)
+    return expanded
+
+def is_title_relevant(query: str, title: str) -> bool:
+    q_lower = query.lower()
+    t_lower = title.lower()
+    
+    # 1. UPDATE STOPWORDS (Tambahkan kata perintah)
+    stopwords = [
+        "tampilkan", "data", "jumlah", "list", "daftar", "di", "kabupaten", "garut", 
+        "tahun", "dan", "yang", "berapa", "statistik", "rekapitulasi", "laporan", 
+        "berikan", "minta", "cari", "tolong", "mohon", "tentang", "semua"
+    ]
+    
+    query_words = [w for w in re.split(r"\W+", q_lower) if w and w not in stopwords and not w.isdigit() and len(w) > 2]
+    
+    if not query_words:
+        return True 
+    
+    hits = 0
+    title_words = set(re.split(r"\W+", t_lower))
+    
+    # Cek kecocokan kata
+    for qw in query_words:
+        match_found = False
+        # 1. Cek Exact Match
+        if qw in title_words:
+            match_found = True
+        # 2. Cek Synonym (Key to Value)
+        elif qw in SYNONYMS:
+            for syn in SYNONYMS[qw]:
+                if syn in title_words:
+                    match_found = True; break
+        # 3. Cek Synonym (Value to Key - misal query 'kemiskinan' title 'miskin')
+        if not match_found:
+             for key, vals in SYNONYMS.items():
+                 if qw in vals and key in title_words:
+                     match_found = True; break
+
+        if match_found: hits += 1
+            
+    # CRITICAL KEYWORDS CHECK
+    CRITICAL_KEYWORDS = ["miskin", "kemiskinan", "stunting", "inflasi", "pdrb", "bawang", "cabe", "beras", "ipm"]
+    for crit in CRITICAL_KEYWORDS:
+        if crit in q_lower:
+            # Pastikan judul mengandung crit ATAU sinonimnya
+            has_crit = (crit in t_lower)
+            if not has_crit:
+                # Cek sinonim dari crit
+                if crit in SYNONYMS:
+                    for syn in SYNONYMS[crit]:
+                        if syn in t_lower: has_crit = True; break
+                # Cek jika crit adalah value dari sinonim lain (misal query 'kemiskinan', cek 'miskin')
+                if not has_crit:
+                    for key, vals in SYNONYMS.items():
+                        if crit in vals and key in t_lower: has_crit = True; break
+            
+            if not has_crit:
+                log.debug(f"[FILTER] REJECT '{title}' -> Missing critical keyword '{crit}'")
+                return False
+
+    return hits > 0
+
 # -------------------------
 # HELPER: Run Gemini safely
 # -------------------------
@@ -100,7 +193,7 @@ def run_gemini(prompt: str) -> str:
 # ======================================================
 # EMBEDDING MODEL & CHROMADB INIT
 # ======================================================
-embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+embedding_model = SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2")
 DB_PATH = os.path.join(os.path.dirname(__file__), "chatbot_db")
 
 try:
@@ -256,74 +349,43 @@ def find_relevant_rows(df: pd.DataFrame, query: str) -> pd.DataFrame:
         return pd.DataFrame()
 
     q_lower = query.lower()
-    
-    # 1. Ekstrak Entitas dari Query
-    # Ambil kata kunci (abaikan kata umum)
-    stop_words = ["berapa", "jumlah", "total", "data", "di", "pada", "tahun", "tampilkan", "list", "daftar", "harga", "dan", "dari", "yang", "kabupaten", "garut"]
+    stop_words = ["berapa", "jumlah", "total", "data", "di", "pada", "tahun", "tampilkan", "list", "daftar", "harga", "dan", "dari", "yang", "kabupaten", "garut", "persentase", "presentase"]
     keywords = [
         w for w in re.split(r"\W+", q_lower) 
         if w and w not in stop_words and not w.isdigit() and len(w) > 2
     ]
-    # Tambahkan frasa penting secara manual
-    if "penduduk miskin" in q_lower:
-        keywords.append("penduduk miskin")
-    if "bawang merah" in q_lower:
-        keywords.append("bawang merah")
-        
-    keywords = list(set(keywords)) # Unik
-    years = re.findall(r"\b(20[1-2][0-9])\b", q_lower) # cari tahun 2010-2029
+    if "penduduk miskin" in q_lower: keywords.append("penduduk miskin")
+    keywords = list(set(keywords))
+    years = re.findall(r"\b(20[1-2][0-9])\b", q_lower)
 
-    # Jika tidak ada keyword/tahun spesifik, kembalikan 10 baris pertama
     if not keywords and not years:
         return df.head(10)
 
-    # 2. Siapkan DataFrame string untuk pencarian
     df_str = df.astype(str).apply(lambda x: x.str.lower())
-    
-    # 3. Terapkan Filter (Logika AND)
-    
-    # Mulai dengan semua baris dianggap benar
     final_mask = pd.Series(True, index=df.index)
 
-    # 3a. Filter berdasarkan Kata Kunci
     if keywords:
         keyword_mask = pd.Series(False, index=df.index)
         for kw in keywords:
-            # Baris harus mengandung SETIDAKNYA SATU keyword
             for col in df_str.columns:
                 keyword_mask |= df_str[col].str.contains(kw, na=False, case=False)
-        
-        # Terapkan filter keyword
         final_mask &= keyword_mask
 
-    # 3b. Filter berdasarkan Tahun
     if years:
         year_mask = pd.Series(False, index=df.index)
         for y in years:
-            # Baris harus mengandung SETIDAKNYA SATU tahun yang diminta
             for col in df_str.columns:
                 year_mask |= df_str[col].str.contains(y, na=False)
-        
-        # Terapkan filter tahun
         final_mask &= year_mask
 
-    # 4. Kembalikan subset
     subset = df[final_mask]
     
-    # Jika hasil filter AND kosong, jangan menyerah. Coba fallback ke keyword saja.
+    # Fallback logic (jika filter AND terlalu ketat)
     if subset.empty and keywords and not years:
          return df[keyword_mask]
     if subset.empty and years and not keywords:
-         return df[year_mask] # Ini yang terjadi di log Anda
+         return df[year_mask]
          
-    # Jika subset masih kosong (karena filter AND gagal),
-    # kita harus menganggapnya TIDAK COCOK.
-    # Namun, jika logika di atas (3a & 3b) sudah benar,
-    # 'subset' akan kosong jika 'APK PAUD' (tidak mengandung 'penduduk miskin') diperiksa.
-    
-    log.debug(f"[find_relevant_rows] Query: '{query}'. Keywords: {keywords}, Years: {years}. Found {len(subset)} rows.")
-    
-    # Jika setelah filter AND hasilnya kosong, berarti memang tidak relevan.
     return subset
 
 def find_date_column(df: pd.DataFrame) -> Optional[str]:
@@ -468,143 +530,270 @@ def query_datasets_semantic(query: str, n_results: int = 6) -> List[Dict[str, An
         log.debug("[CHROMADB] query failed: %s", e)
         return []
 
-# -------------------------
-# HANDLE DATASET SEARCH (core)
-# -------------------------
+# =====================================================
+# HELPERS: SCORING & RANKING (ANTI TYPO & ROBUST)
+# =====================================================
+def calculate_smart_score(query: str, title: str) -> float:
+    """
+    Menghitung skor dengan toleransi TYPO.
+    Jika user mengetik 'miskn', sistem tetap menganggap itu 'miskin' 
+    dan menerapkan filter topik kritis.
+    """
+    q_lower = query.lower()
+    t_lower = title.lower()
+    score = 0.0
+    
+    # Pecah query menjadi kata-kata (token)
+    q_tokens = [w for w in re.split(r"\W+", q_lower) if len(w) > 2]
+    t_tokens = set(re.split(r"\W+", t_lower))
+    
+    # 1. Base Score (Fuzzy Match)
+    match_count = 0
+    for qw in q_tokens:
+        # Cari kata di judul yang mirip dengan kata di query (cutoff 0.8 = 80% mirip)
+        # Ini menangani 'penddk' -> 'penduduk'
+        matches = difflib.get_close_matches(qw, t_tokens, n=1, cutoff=0.8)
+        if matches:
+            match_count += 1
+            score += 1.0 
+    
+    # Normalisasi score
+    if len(q_tokens) > 0:
+        score = (score / len(q_tokens)) * 2.0
+
+    # 2. CRITICAL SUBJECT FILTER (WAJIB ADA)
+    # Daftar kata yang jika diminta, harus ada di judul (atau sinonimnya)
+    CRITICAL_SUBJECTS = [
+        "miskin", "kemiskinan", "stunting", "disabilitas", "inflasi", "pdrb", 
+        "wisata", "sekolah", "puskesmas", "bawang", "cabe", "beras", "jagung",
+        "penduduk", "warga", "korban", "bencana"
+    ]
+    
+    # Cek intent user (walaupun typo)
+    detected_intent = []
+    for subject in CRITICAL_SUBJECTS:
+        # Apakah query mengandung kata yang mirip subject?
+        if subject in q_lower or difflib.get_close_matches(subject, q_tokens, n=1, cutoff=0.8):
+            detected_intent.append(subject)
+
+    # Terapkan Hukuman
+    for subject in detected_intent:
+        found_in_title = False
+        
+        # Cek di Title (Exact, Synonym, atau Typo)
+        if subject in t_lower: 
+            found_in_title = True
+        elif subject in SYNONYMS: # Cek sinonim
+            for syn in SYNONYMS[subject]:
+                if syn in t_lower: found_in_title = True; break
+        
+        if not found_in_title: # Cek reverse sinonim
+            for key, vals in SYNONYMS.items():
+                if subject in vals and key in t_lower: found_in_title = True; break
+
+        if not found_in_title: # Cek fuzzy di title
+             if difflib.get_close_matches(subject, t_tokens, n=1, cutoff=0.85):
+                 found_in_title = True
+
+        if not found_in_title:
+            score -= 10.0 # HUKUMAN: Intent terdeteksi tapi judul tidak cocok
+
+    # 3. CONFLICT PENALTIES (Jumlah vs Persentase)
+    has_jumlah_query = "jumlah" in q_lower or difflib.get_close_matches("jumlah", q_tokens, n=1, cutoff=0.85)
+    has_persen_query = "persentase" in q_lower or "presentase" in q_lower
+    
+    has_jumlah_title = "jumlah" in t_lower
+    has_persen_title = "persentase" in t_lower
+
+    if has_jumlah_query and has_persen_title and not has_jumlah_title:
+        score -= 5.0
+    if has_persen_query and has_jumlah_title and not has_persen_title:
+        score -= 5.0
+
+    # 4. EXACT PHRASE BOOSTER
+    if "penduduk miskin" in q_lower and "penduduk miskin" in t_lower:
+        score += 3.0
+
+    return score
+
+
+# =====================================================
+# MODIFIKASI: handle_dataset_search
+# =====================================================
 def handle_dataset_search(query: str, show_preview: bool = False):
     log.info("[DATA_AGENT] Mencari dataset untuk query: %s", query)
 
-    try:
-        # 1. Ambil Top 5 kandidat semantik (seperti debug_query)
-        candidates = search_dataset_embeddings(query, n_results=5) # n_results=5 dari default fungsi
+    # 1. Deteksi Tahun
+    year_match = re.search(r"\b(20[1-2][0-9])\b", query)
+    target_year = year_match.group(1) if year_match else None
+    has_year = bool(target_year)
+    
+    # Ambil kandidat
+    candidates = search_dataset_embeddings(query, n_results=30)
 
-        if not candidates:
-            return {
-                "status": "error",
-                "query": query,
-                "error_message": f"Tidak ditemukan dataset yang relevan untuk: '{query}'."
-            }
+    if not candidates:
+        return {"status": "not_found"}
 
-        # 2. Iterasi dan Validasi (LOGIKA BARU YANG PENTING)
-        # Kita cari kandidat pertama yang *benar-benar* berisi data yang diminta.
+    potential_matches = []
+    seen_titles = set()
+
+    # 2. FILTERING AWAL
+    for cand in candidates:
+        title = cand.get("title") or cand.get("judul") or "Dataset"
+        download_url = cand.get("download_url")
+        dist = cand.get("_distance", 99.0)
+
+        # Threshold longgar
+        if dist > 25.0: continue 
+        if not download_url: continue
         
-        best_subset = None
-        chosen_dataset = None
+        # Validasi Topik Dasar
+        if not is_title_relevant(query, title):
+            continue 
 
-        for cand in candidates:
-            title = cand.get("title") or cand.get("judul") or "Dataset"
-            download_url = cand.get("download_url") or cand.get("file_url")
-            dist = cand.get("_distance", 99.0)
+        # Filter Tahun
+        if has_year:
+            if target_year in title:
+                potential_matches.append(cand)
+        else:
+            if title not in seen_titles:
+                potential_matches.append(cand)
+                seen_titles.add(title)
 
-            if not download_url:
-                log.debug(f"[DATA_AGENT] Skipping '{title}' (no download_url)")
-                continue
+    if not potential_matches:
+        if has_year:
+             # Fallback cek isi file jika judul tidak ada tahun
+             potential_matches = candidates[:5]
+        else:
+             return {"status": "not_found"}
 
-            # Jangan buang kandidat hanya karena jarak, kecuali jaraknya sangat jauh
-            if dist > 1.4: # Threshold yang lebih longgar, biarkan konten yang menentukan
-                log.debug(f"[DATA_AGENT] Skipping '{title}' (Distance {dist:.4f} > 1.4)")
-                continue
+    # 3. SMART RERANKING
+    scored_candidates = []
+    for cand in potential_matches:
+        title = cand.get("title", "")
+        # Gunakan fungsi GLOBAL calculate_smart_score
+        smart_score = calculate_smart_score(query, title)
+        cand["_smart_score"] = smart_score
+        scored_candidates.append(cand)
 
-            log.debug(f"[DATA_AGENT] Validating candidate: '{title}' (Dist: {dist:.4f})")
+    # Urutkan Score Tertinggi
+    scored_candidates.sort(key=lambda x: x["_smart_score"], reverse=True)
 
-            # Unduh file untuk diinspeksi
-            df = load_full_dataframe_from_url(download_url)
-            
-            if df is None or df.empty:
-                log.debug(f"[DATA_AGENT] Skipping '{title}' (failed to load or empty)")
-                continue
-                
-            # Validasi: Apakah file ini berisi baris yang kita cari?
-            # (Misal: Apakah file 'Penduduk 2024' ini berisi '2022'?)
-            subset = find_relevant_rows(df, query)
-            
-            if not subset.empty:
-                # --- DITEMUKAN! ---
-                # File ini adalah yang kita cari.
-                log.info(f"[DATA_AGENT] Match! '{title}' (Dist: {dist:.4f}) contains relevant data.")
-                best_subset = subset
-                chosen_dataset = cand
-                break # Hentikan iterasi, kita sudah punya pemenangnya
-            else:
-                # File ini mirip, tapi tidak berisi data spesifik yang diminta.
-                log.debug(f"[DATA_AGENT] No relevant rows found in '{title}' for query.")
+    # Cek kualitas kandidat terbaik
+    if not scored_candidates or scored_candidates[0]["_smart_score"] < 0:
+        return {"status": "not_found"}
 
-        # 3. Handle jika TIDAK ADA yang cocok setelah iterasi
-        if best_subset is None or chosen_dataset is None:
-            log.warning(f"[DATA_AGENT] No validated match for: '{query}'. Top semantic hit: '{candidates[0].get('title')}'")
-            return {
-                "status": "error",
-                "query": query,
-                "error_message": (
-                    f"Saya menemukan beberapa dataset yang mirip (misalnya: '{candidates[0].get('title')}'), "
-                    f"tetapi tidak ada yang berisi data spesifik untuk: '{query}'."
-                )
-            }
+    # ===============================================================
+    # PERBAIKAN UTAMA DI SINI:
+    # Jika tidak ada tahun (Query Umum), LANGSUNG return List Mode.
+    # Jangan mencoba load file satu per satu.
+    # ===============================================================
+    if not has_year:
+         options = []
+         list_text = "Saya menemukan beberapa dataset yang relevan:\n"
+         used_titles = set()
+         
+         # Hanya ambil yang skor positif (> 0)
+         valid_options = [c for c in scored_candidates if c["_smart_score"] > 0]
+         
+         if not valid_options:
+             return {"status": "not_found"}
 
-        # 4. PROSES PEMENANG
-        # Kita sekarang punya `best_subset` (DataFrame) dan `chosen_dataset` (Metadata)
+         for c in valid_options:
+             t = c.get("title", "").strip()
+             if t in used_titles: continue
+             used_titles.add(t)
+             
+             # Buat Value tombol
+             options.append({"label": t, "value": f"Tampilkan data {t}"})
+             list_text += f"\n* **{t}**"
+             
+             if len(options) >= 5: break
+         
+         return {
+             "status": "multiple_options", 
+             "response_text": list_text, 
+             "options": options
+         }
+
+    # 4. LOGIC KHUSUS (Jika User Minta Tahun Spesifik)
+    final_result = None
+    
+    for match_cand in scored_candidates[:3]:
+        # Skip jika skor minus
+        if match_cand["_smart_score"] < 0: continue
+
+        title = match_cand.get("title")
+        download_url = match_cand.get("download_url")
         
-        title = chosen_dataset.get("title") or "Dataset"
-        landing_page = chosen_dataset.get("landing_page") or chosen_dataset.get("download_url")
+        df = load_full_dataframe_from_url(download_url)
+        subset = find_relevant_rows(df, query)
+        
+        if df is not None and not subset.empty:
+            final_result = {
+                "candidate": match_cand,
+                "subset": subset,
+                "df": df
+            }
+            break 
 
-        # Analisis menggunakan LLM HANYA pada baris yang relevan
-        ai_analysis = analyze_data_with_llm(query, best_subset)
-
-        # Siapkan preview jika diminta
-        data_preview = []
+    if final_result:
+        cand = final_result["candidate"]
+        subset = final_result["subset"]
+        title = cand.get("title")
+        landing_page = cand.get("landing_page") or cand.get("download_url")
+        
+        ai_analysis = analyze_data_with_llm(query, subset)
+        
         preview_md = ""
         if show_preview:
-            preview_df = best_subset.head(5) # Ambil 5 baris pertama dari subset
-            data_preview = preview_df.to_dict(orient="records")
+            preview_df = subset.head(5)
             preview_md = tabulate(preview_df, headers="keys", tablefmt="github")
-
-        # 5. Susun Respon Final
-        response_text = (
-            f"**{title}**\n\n"
-            f"\n{ai_analysis}\n"
-        )
-
+            
+        response_text = f"**{title}**\n\n{ai_analysis}\n"
         if show_preview and preview_md:
-            response_text += f"\n**Pratinjau Data Relevan:**\n{preview_md}"
-        
+            response_text += f"\n**Pratinjau Data:**\n{preview_md}"
         if landing_page:
-            response_text += f"\n\n[Lihat Dataset Lengkap]({landing_page})"
+            response_text += f"\n\n[Lihat Sumber Data]({landing_page})"
+            
+        return { "status": "success", "response_text": response_text }
 
-        return {
-            "status": "success",
-            "dataset_title": title,
-            "ai_analysis": ai_analysis,
-            "data_preview": data_preview,
-            "response_text": response_text, # Kita kirim teks lengkap
-            "landing_page": landing_page
-        }
-
-    except Exception as e:
-        log.exception("[DATA_AGENT] Unhandled Error: %s", e)
-        return {
-            "status": "error",
-            "query": query,
-            "error_message": "Terjadi error internal saat memproses dataset."
-        }
+    return {"status": "not_found"}
 
 # -------------------------
 # HANDLE GENERAL QUESTION (site guide)
 # -------------------------
-def handle_general_question(query: str) -> dict:
+def handle_general_question(query: str, context: str = "") -> dict:
     try:
-        # Gunakan LLM untuk menjawab langsung
-        prompt = (
-            "Anda adalah asisten AI 'Satu Data Garut'. Jawab pertanyaan berikut dengan singkat, ramah, "
-            "dan hanya berdasarkan informasi yang relevan jika tersedia. "
-            "Jika data resmi tidak ada, beri tahu pengguna secara wajar.\n\n"
-            f"PERTANYAAN: {query}\nJAWABAN:"
-        )
+        # Prompt diperbarui: Lebih cerdas membedakan konteks
+        prompt = f"""
+Anda adalah Asisten AI untuk Portal "Satu Data Garut".
+
+Tugas Anda adalah menjawab pertanyaan pengguna yang TIDAK ditemukan di database dataset statistik.
+
+Aturan Menjawab:
+1. **JIKA PERTANYAAN UMUM / PENGETAHUAN (General Knowledge):**
+   (Contoh: "Kabupaten Tasikmalaya", "Apa itu Stunting", "Resep Nasi Goreng", "Lokasi Garut")
+   - Jawablah secara LANGSUNG, informatif, dan membantu.
+   - **JANGAN** meminta maaf.
+   - **JANGAN** menyebutkan bahwa "dataset tidak ditemukan".
+   - Anggaplah Anda sedang mengobrol biasa.
+
+2. **JIKA PERTANYAAN MEMINTA DATA STATISTIK/ANGKA SPESIFIK:**
+   (Contoh: "Berapa jumlah penduduk Tasikmalaya 2024?", "Data inflasi bulan ini")
+   - Karena Anda tidak menemukan datanya di database internal, katakan dengan sopan bahwa "Data spesifik untuk ini belum tersedia di Satu Data Garut".
+   - Lalu berikan informasi umum atau saran untuk mengecek ke instansi terkait (misal BPS).
+
+Pertanyaan Pengguna: "{query}"
+
+Jawaban Anda:
+"""
         resp_text = run_gemini(prompt)
         return {"reply": resp_text}
     except Exception as e:
         log.exception("[GENERAL] error: %s", e)
-        return {"reply": "Maaf, terjadi masalah saat mencoba menjawab pertanyaan Anda."}
-
+        return {"reply": "Maaf, layanan AI sedang sibuk."}
+          
 # -------------------------
 # LIST SECTORS
 # -------------------------
@@ -733,48 +922,57 @@ def handle_chat():
                 log.exception("sector parse error: %s", e)
                 return jsonify({"reply": "Maaf, terjadi kesalahan saat memproses permintaan sektor Anda."}), 200
 
-# GANTI BLOK INI DI DALAM FUNGSI handle_chat (mulai baris 792)
-
-        # ---- DATA AGENT ----
+# ---- DATA AGENT ----
         if intent == "run_data_agent":
             subs = decompose_query_with_llm(user_query)
-            if not subs:
-                subs = [user_query]
+            if not subs: subs = [user_query]
+            
+            final_responses = []
+            related_options = []
+            found_any_data = False
 
-            all_results = []
             for s in subs:
-                try:
-                    # 'show_preview' sudah diteruskan. 
-                    # 'handle_dataset_search' sekarang akan mengurus logikanya.
-                    res = handle_dataset_search(s, show_preview=show_preview)
-                    all_results.append(res)
-                except Exception as e:
-                    log.debug("[AGENT] error for sub %s: %s", s, e)
-                    all_results.append({"status": "error", "query": s, "error_message": "Error internal saat pencarian."})
-
-            successful = [r for r in all_results if r.get("status") == "success"]
-            errors = [r.get("error_message") for r in all_results if r.get("status") == "error"]
-
-            if successful:
-                # LOGIKA BARU: Cukup gabungkan 'response_text' yang sudah jadi
-                # dari setiap hasil yang sukses.
-                final_reply = "\n\n---\n\n".join([r.get("response_text", "") for r in successful]).strip()
+                res = handle_dataset_search(s, show_preview=show_preview)
                 
-                return jsonify({"reply": final_reply, "results": successful}), 200
-            else:
-                # Logika error masih sama
-                combined = "\n".join(errors) if errors else "Maaf, saya tidak menemukan data yang dimaksud."
-                return jsonify({"reply": combined, "results": []}), 200
+                if res["status"] == "success":
+                    found_any_data = True
+                    final_responses.append(res["response_text"])
+                elif res["status"] == "multiple_options":
+                    found_any_data = True
+                    final_responses.append(res["response_text"])
+                    if "options" in res:
+                        related_options.extend(res["options"])
+                
+                # Jika status == "not_found", loop lanjut ke query berikutnya
+            
+            # 2. JIKA DATA DITEMUKAN -> Tampilkan Data
+            if found_any_data:
+                combined_text = "\n\n---\n\n".join(final_responses)
+                return jsonify({
+                    "reply": combined_text, 
+                    "related_queries": related_options 
+                }), 200
+            
+            # 3. JIKA TIDAK ADA DATA SAMA SEKALI -> FALLBACK KE LLM
+            # Ini yang menjawab request "Jawaban bukan mencari data terdekat, tapi jawaban LLM"
+            
+            log.info("[FALLBACK] Dataset strict filter rejected all candidates. Asking LLM General Knowledge.")
+            
+            fallback_out = handle_general_question(user_query)
+            llm_reply = fallback_out.get("reply", "")
+            
+            return jsonify({
+                "reply": llm_reply, # Langsung kirim jawaban LLM yang sopan tadi
+                "results": []
+            }), 200
 
-        # ---- FALLBACK ----
-        reply = "Maaf, saya belum bisa menjawab pertanyaan ini."
-        # cache_set(user_query, reply)
-        return jsonify({"reply": reply}), 200
+        # ... (Fallback global)
+        return jsonify({"reply": "Maaf, saya tidak mengerti."}), 200
 
     except Exception as e:
-        log.exception("[HANDLE_CHAT] Unhandled exception: %s", e)
-        return jsonify({"reply": "Maaf, layanan AI sedang tidak merespons."}), 200
-    
+        log.exception("Error utama: %s", e)
+        return jsonify({"reply": "Terjadi kesalahan internal server."}), 500
+        
 # -------------------------
 # RUN FLASK
 # -------------------------
