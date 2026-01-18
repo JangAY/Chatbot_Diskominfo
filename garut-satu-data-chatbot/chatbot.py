@@ -793,39 +793,81 @@ Jawaban Anda:
     except Exception as e:
         log.exception("[GENERAL] error: %s", e)
         return {"reply": "Maaf, layanan AI sedang sibuk."}
-          
+# -------------------------
+# HELPER: Get All Sectors (Publishers)
+# -------------------------
+def get_all_publishers() -> List[str]:
+    """Mengambil daftar unik nama Publisher/Dinas dari ChromaDB."""
+    if dataset_collection is None:
+        return []
+    try:
+        # Ambil metadata saja untuk efisiensi
+        data = dataset_collection.get(include=["metadatas"])
+        publishers = set()
+        
+        for md in data.get("metadatas", []):
+            if isinstance(md, dict) and "publisher" in md:
+                p = md["publisher"]
+                if p: publishers.add(p.strip())
+            elif isinstance(md, list): # Jaga-jaga nested list
+                for sub in md:
+                    if isinstance(sub, dict) and "publisher" in sub:
+                         p = sub["publisher"]
+                         if p: publishers.add(p.strip())
+        
+        return list(publishers)
+    except Exception as e:
+        log.error(f"[GET_PUBLISHERS] Error: {e}")
+        return []
+              
 # -------------------------
 # LIST SECTORS
 # -------------------------
 def handle_list_sectors() -> dict:
+    log.info("[LIST] Memproses permintaan daftar sektor...")
     if dataset_collection is None:
         return {"reply": "Error: Database dataset tidak dapat diakses."}
     try:
         data = dataset_collection.get(include=["metadatas"])
         publishers = set()
 
-        for md in data.get("metadatas", []):
-            # debug print isi md
-            log.debug("[LIST] md content: %s", md)
+        metas = data.get("metadatas", [])
+        # Jaga-jaga jika metas None
+        if not metas: 
+            metas = []
 
-            # jika md adalah list atau dict nested
+        for md in metas:
+            # Kadang metadata bisa None atau list jika database korup/kosong
             if isinstance(md, dict) and "publisher" in md:
-                publishers.add(md["publisher"])
+                p = md["publisher"]
+                if p: publishers.add(p.strip())
             elif isinstance(md, list):
                 for sub in md:
                     if isinstance(sub, dict) and "publisher" in sub:
-                        publishers.add(sub["publisher"])
+                         p = sub["publisher"]
+                         if p: publishers.add(p.strip())
 
         if not publishers:
+            log.warning("[LIST] Tidak ada publisher ditemukan di metadata.")
             return {"reply": "Maaf, saat ini tidak ada sektor yang terdaftar di database."}
 
-        new_replies = [{"label": p, "value": f"Tampilkan dataset sektor {p}"} for p in sorted(list(publishers))]
-        return {"reply": "Tentu, berikut daftar sektor (OPD) yang datanya tersedia.", "newQuickReplies": new_replies}
+        # Urutkan secara alfabet
+        sorted_pubs = sorted(list(publishers))
+        
+        # Buat Quick Replies (Tombol)
+        new_replies = [{"label": p, "value": f"Tampilkan dataset sektor {p}"} for p in sorted_pubs]
+        
+        # Buat Text List
+        list_text = "Tentu, berikut daftar sektor (OPD) yang datanya tersedia:\n"
+        for p in sorted_pubs:
+            list_text += f"\n* {p}"
+
+        return {"reply": list_text, "newQuickReplies": new_replies}
 
     except Exception as e:
-        log.debug("[LIST] error: %s", e)
+        log.exception("[LIST] error: %s", e)
         return {"reply": "Maaf, terjadi kesalahan saat mengambil daftar sektor."}
-    
+            
 # -------------------------
 # SECTOR SEARCH
 # -------------------------
@@ -834,37 +876,113 @@ def handle_sector_search(sector_name: str) -> dict:
         return {"reply": "Error: Database dataset tidak dapat diakses."}
     try:
         data = dataset_collection.get(include=["metadatas"])
-        # Filter berdasarkan publisher, bukan title
-        metas = [
-            md for md in data.get("metadatas", [])
-            if md.get("publisher", "").strip().lower() == sector_name.strip().lower()
-        ]
+        
+        # 1. Filter Metadata berdasarkan Nama Publisher/Sektor
+        metas = []
+        all_metas = data.get("metadatas", [])
+        
+        for md in all_metas:
+            pub = md.get("publisher", "").strip()
+            # Cek exact match atau contains
+            if sector_name.lower() in pub.lower():
+                metas.append(md)
+
         if not metas:
             return {"reply": f"Maaf, saya tidak menemukan dataset untuk sektor '{sector_name}'."}
 
-        response_list = [f"Tentu, berikut beberapa dataset teratas untuk **{sector_name}**:"]
-        for i, md in enumerate(metas[:10], start=1):
-            title = md.get("title", "Tanpa Judul")
-            url = md.get("landing_page") or md.get("download_url") or "#"
-            response_list.append(f"{i}. **{title}** - [Link sumber data]({url})")
+        # 2. Urutkan (Opsional: berdasarkan tahun terbaru jika ada)
+        # Kita coba sort by title dulu agar rapi
+        metas.sort(key=lambda x: x.get("title", ""))
 
-        return {"reply": "\n".join(response_list)}
+        # 3. Buat Clickable Options
+        options = []
+        list_text = f"Berikut adalah dataset yang tersedia dari **{sector_name}**. Silakan pilih data untuk ditampilkan:\n"
+        
+        # Batasi 10 dataset agar tidak terlalu panjang
+        for md in metas[:10]:
+            title = md.get("title", "Tanpa Judul")
+            
+            # Value ini akan dikirim balik ke chatbot seolah user mengetiknya
+            trigger_query = f"Tampilkan data {title}"
+            
+            options.append({
+                "label": title,
+                "value": trigger_query
+            })
+            list_text += f"\n* **{title}**"
+
+        # Return format yang mendukung opsi
+        return {
+            "status": "multiple_options",
+            "response_text": list_text,
+            "options": options
+        }
+
     except Exception as e:
         log.debug("[SECTOR] error: %s", e)
         return {"reply": f"Maaf, terjadi kesalahan saat mencari data untuk sektor '{sector_name}'."}
-    
+        
 # -------------------------
 # INTENT CLASSIFIER
 # -------------------------
 def classify_intent(processed_query: str, raw_query: str) -> str:
     raw_lower = raw_query.lower().strip()
-    if raw_lower == "apa saja dataset yang tersedia?":
+    
+    # ---------------------------------------------------------
+    # PRIORITAS 1: TOMBOL & PERINTAH BAKU (HARUS MENANG DULUAN)
+    # ---------------------------------------------------------
+    
+    # 1. Cek Tombol "Apa saja dataset yang tersedia?"
+    if raw_lower == "apa saja dataset yang tersedia?" or raw_lower == "apa saja dataset yang tersedia":
         return "list_sectors"
+
+    # 2. Cek Tombol Sektor "Tampilkan dataset sektor X"
     if raw_lower.startswith("tampilkan dataset sektor"):
         return "dataset_sector_search"
-    general_keywords = ["siapa kamu", "apa itu", "bagaimana cara", "jelaskan", "apa yang dimaksud"]
+
+    # 3. Cek Keyword Manual untuk List Sektor
+    # Menangkap: "list sektor", "daftar dinas", "tampilkan opd"
+    sector_keywords = ["sektor", "dinas", "opd", "skpd", "instansi"]
+    ask_keywords = ["apa saja", "list", "daftar", "tampilkan", "sebutkan", "tersedia", "ada", "lihat", "menu"]
+    
+    has_sector = any(k in raw_lower for k in sector_keywords)
+    has_ask = any(k in raw_lower for k in ask_keywords)
+    
+    # Trigger kata tunggal/pendek
+    if raw_lower in ["sektor", "list sektor", "daftar sektor", "opd", "dinas", "menu", "list"]:
+        return "list_sectors"
+    
+    # Trigger kombinasi
+    if has_sector and has_ask:
+        return "list_sectors"
+
+    # ---------------------------------------------------------
+    # PRIORITAS 2: DIRECT PUBLISHER SEARCH (NAMING CHECK)
+    # ---------------------------------------------------------
+    # Logika ini ditaruh SETELAH List Sektor agar tidak salah tangkap.
+    
+    known_publishers = get_all_publishers()
+    
+    # Urutkan dari nama terpanjang agar "Dinas Kesehatan" terdeteksi sebelum "Dinas"
+    known_publishers.sort(key=len, reverse=True)
+    
+    for pub in known_publishers:
+        # Filter: Jangan trigger jika nama publisher terlalu pendek (misal singkatan < 3 huruf)
+        if len(pub) < 3: continue
+        
+        # Cek apakah nama publisher ada di query
+        if pub.lower() in raw_lower:
+            return "dataset_sector_search_direct"
+
+    # ---------------------------------------------------------
+    # PRIORITAS 3: GENERAL QUESTION & DATA AGENT
+    # ---------------------------------------------------------
+    general_keywords = ["siapa kamu", "apa itu", "bagaimana cara", "jelaskan", "apa yang dimaksud", "selamat", "halo", "hai", "pagi", "siang", "sore", "malam", "terima kasih"]
+    
     if any(raw_lower.startswith(k) for k in general_keywords):
         return "general_question"
+        
+    # Default: Anggap user sedang mencari data spesifik
     return "run_data_agent"
 
 # -------------------------
@@ -903,26 +1021,67 @@ def handle_chat():
             # cache_set(user_query, reply)
             return jsonify({"reply": reply}), 200
 
-        # ---- LIST SECTORS ----
+        # ==========================================================
+        # 1. LIST SECTORS
+        # ==========================================================
         if intent == "list_sectors":
             out = handle_list_sectors()
-            reply = out.get("reply", "Maaf, terjadi kesalahan.")
-            # cache_set(user_query, reply)
             return jsonify(out), 200
 
-        # ---- SECTOR SEARCH ----
+        # ==========================================================
+        # 2. SECTOR SEARCH - DIRECT MENTION (Misal: "Kecamatan Cilawu")
+        # ==========================================================
+        if intent == "dataset_sector_search_direct":
+            try:
+                known_publishers = get_all_publishers()
+                target_sector = None
+                known_publishers.sort(key=len, reverse=True)
+                
+                for pub in known_publishers:
+                    if pub.lower() in user_query.lower():
+                        target_sector = pub
+                        break
+                
+                if target_sector:
+                    log.info(f"[DIRECT SECTOR] Found: {target_sector}")
+                    out = handle_sector_search(target_sector)
+                    
+                    # --- PERUBAHAN DI SINI ---
+                    # Petakan 'response_text' ke 'reply' dan 'options' ke 'related_queries'
+                    return jsonify({
+                        "reply": out.get("response_text", out.get("reply", "")),
+                        "related_queries": out.get("options", [])
+                    }), 200
+                else:
+                    return jsonify({"reply": "Maaf, saya mendeteksi nama dinas tapi tidak menemukannya di database."}), 200
+            except Exception as e:
+                log.exception("direct sector error: %s", e)
+                return jsonify({"reply": "Terjadi kesalahan sistem."}), 200
+
+        # ==========================================================
+        # 3. SECTOR SEARCH - BUTTON CLICK (Format Baku)
+        # ==========================================================
         if intent == "dataset_sector_search":
             try:
-                sector_name = user_query.split("Tampilkan dataset sektor", 1)[-1].strip()
-                out = handle_sector_search(sector_name)
-                reply = out.get("reply", "")
-                # cache_set(user_query, reply)
-                return jsonify(out), 200
+                # Format: "Tampilkan dataset sektor [Nama Sektor]"
+                if "sektor" in user_query.lower():
+                    parts = re.split(r"sektor", user_query, flags=re.IGNORECASE)
+                    if len(parts) > 1:
+                        sector_name = parts[-1].strip()
+                        out = handle_sector_search(sector_name)
+                        
+                        # --- PERUBAHAN DI SINI ---
+                        return jsonify({
+                            "reply": out.get("response_text", out.get("reply", "")),
+                            "related_queries": out.get("options", [])
+                        }), 200
+                
+                return jsonify({"reply": "Maaf, format request sektor tidak dikenali."}), 200
             except Exception as e:
                 log.exception("sector parse error: %s", e)
-                return jsonify({"reply": "Maaf, terjadi kesalahan saat memproses permintaan sektor Anda."}), 200
-
-# ---- DATA AGENT ----
+                return jsonify({"reply": "Maaf, terjadi kesalahan saat memproses permintaan sektor."}), 200
+                                    
+        # ---- DATA AGENT ----
         if intent == "run_data_agent":
             subs = decompose_query_with_llm(user_query)
             if not subs: subs = [user_query]

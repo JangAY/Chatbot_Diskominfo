@@ -531,7 +531,94 @@ def query_datasets_semantic(query: str, n_results: int = 6) -> List[Dict[str, An
         return []
 
 # =====================================================
-# MODIFIKASI: handle_dataset_search (DENGAN RERANKING)
+# HELPERS: SCORING & RANKING (ANTI TYPO & ROBUST)
+# =====================================================
+def calculate_smart_score(query: str, title: str) -> float:
+    """
+    Menghitung skor dengan toleransi TYPO.
+    Jika user mengetik 'miskn', sistem tetap menganggap itu 'miskin' 
+    dan menerapkan filter topik kritis.
+    """
+    q_lower = query.lower()
+    t_lower = title.lower()
+    score = 0.0
+    
+    # Pecah query menjadi kata-kata (token)
+    q_tokens = [w for w in re.split(r"\W+", q_lower) if len(w) > 2]
+    t_tokens = set(re.split(r"\W+", t_lower))
+    
+    # 1. Base Score (Fuzzy Match)
+    match_count = 0
+    for qw in q_tokens:
+        # Cari kata di judul yang mirip dengan kata di query (cutoff 0.8 = 80% mirip)
+        # Ini menangani 'penddk' -> 'penduduk'
+        matches = difflib.get_close_matches(qw, t_tokens, n=1, cutoff=0.8)
+        if matches:
+            match_count += 1
+            score += 1.0 
+    
+    # Normalisasi score
+    if len(q_tokens) > 0:
+        score = (score / len(q_tokens)) * 2.0
+
+    # 2. CRITICAL SUBJECT FILTER (WAJIB ADA)
+    # Daftar kata yang jika diminta, harus ada di judul (atau sinonimnya)
+    CRITICAL_SUBJECTS = [
+        "miskin", "kemiskinan", "stunting", "disabilitas", "inflasi", "pdrb", 
+        "wisata", "sekolah", "puskesmas", "bawang", "cabe", "beras", "jagung",
+        "penduduk", "warga", "korban", "bencana"
+    ]
+    
+    # Cek intent user (walaupun typo)
+    detected_intent = []
+    for subject in CRITICAL_SUBJECTS:
+        # Apakah query mengandung kata yang mirip subject?
+        if subject in q_lower or difflib.get_close_matches(subject, q_tokens, n=1, cutoff=0.8):
+            detected_intent.append(subject)
+
+    # Terapkan Hukuman
+    for subject in detected_intent:
+        found_in_title = False
+        
+        # Cek di Title (Exact, Synonym, atau Typo)
+        if subject in t_lower: 
+            found_in_title = True
+        elif subject in SYNONYMS: # Cek sinonim
+            for syn in SYNONYMS[subject]:
+                if syn in t_lower: found_in_title = True; break
+        
+        if not found_in_title: # Cek reverse sinonim
+            for key, vals in SYNONYMS.items():
+                if subject in vals and key in t_lower: found_in_title = True; break
+
+        if not found_in_title: # Cek fuzzy di title
+             if difflib.get_close_matches(subject, t_tokens, n=1, cutoff=0.85):
+                 found_in_title = True
+
+        if not found_in_title:
+            score -= 10.0 # HUKUMAN: Intent terdeteksi tapi judul tidak cocok
+
+    # 3. CONFLICT PENALTIES (Jumlah vs Persentase)
+    has_jumlah_query = "jumlah" in q_lower or difflib.get_close_matches("jumlah", q_tokens, n=1, cutoff=0.85)
+    has_persen_query = "persentase" in q_lower or "presentase" in q_lower
+    
+    has_jumlah_title = "jumlah" in t_lower
+    has_persen_title = "persentase" in t_lower
+
+    if has_jumlah_query and has_persen_title and not has_jumlah_title:
+        score -= 5.0
+    if has_persen_query and has_jumlah_title and not has_persen_title:
+        score -= 5.0
+
+    # 4. EXACT PHRASE BOOSTER
+    if "penduduk miskin" in q_lower and "penduduk miskin" in t_lower:
+        score += 3.0
+
+    return score
+
+
+# =====================================================
+# MODIFIKASI: handle_dataset_search
 # =====================================================
 def handle_dataset_search(query: str, show_preview: bool = False):
     log.info("[DATA_AGENT] Mencari dataset untuk query: %s", query)
@@ -541,92 +628,103 @@ def handle_dataset_search(query: str, show_preview: bool = False):
     target_year = year_match.group(1) if year_match else None
     has_year = bool(target_year)
     
-    # Ambil kandidat LEBIH BANYAK (25) agar dataset yang benar ('Jumlah Penduduk') 
-    # memiliki kesempatan terambil meskipun skor vektornya kalah dari 'Persentase'.
-    candidates = search_dataset_embeddings(query, n_results=25)
+    # Ambil kandidat
+    candidates = search_dataset_embeddings(query, n_results=30)
 
     if not candidates:
         return {"status": "not_found"}
 
-    # Container untuk kandidat potensial
     potential_matches = []
     seen_titles = set()
 
-    # 2. FILTERING AWAL (Topik & Tahun)
+    # 2. FILTERING AWAL
     for cand in candidates:
         title = cand.get("title") or cand.get("judul") or "Dataset"
         download_url = cand.get("download_url")
         dist = cand.get("_distance", 99.0)
 
-        # Threshold longgar (karena model multilingual)
+        # Threshold longgar
         if dist > 25.0: continue 
         if not download_url: continue
         
-        # Validasi Topik (Keyword Check)
+        # Validasi Topik Dasar
         if not is_title_relevant(query, title):
             continue 
 
-        # --- LOGIKA BARU UNTUK TAHUN ---
+        # Filter Tahun
         if has_year:
-            # Jika user minta tahun spesifik, judul WAJIB punya tahun itu
             if target_year in title:
                 potential_matches.append(cand)
-            else:
-                log.debug(f"  -> Skip: Title doesn't have year {target_year}")
         else:
-            # Jika query umum, ambil semua yang unik
             if title not in seen_titles:
                 potential_matches.append(cand)
                 seen_titles.add(title)
 
-    # Jika tidak ada yang cocok
     if not potential_matches:
-        # Fallback: Jika user minta tahun 2023 tapi tidak ada di judul,
-        # mungkin ada di dalam file dataset terbaru. Ambil top 3 semantic.
         if has_year:
-             log.info("  -> Fallback: Tahun tidak ada di judul, cek isi file top 3...")
-             potential_matches = candidates[:3] # Ambil 3 teratas saja
+             # Fallback cek isi file jika judul tidak ada tahun
+             potential_matches = candidates[:5]
         else:
              return {"status": "not_found"}
 
-    # 3. RERANKING / SCORING (Cari yang paling mirip dengan query)
-    # Kita gunakan difflib untuk membandingkan string query dengan judul dataset
-    # Ini akan memenangkan "Jumlah Penduduk" dibanding "Persentase..." jika querynya "Jumlah"
-    
-    def calculate_similarity(candidate):
-        title = candidate.get("title", "").lower()
-        # Hitung kemiripan string
-        ratio = difflib.SequenceMatcher(None, query.lower(), title).ratio()
-        
-        # BOOSTER: Jika query mengandung kata "jumlah" dan judul juga, beri nilai plus
-        if "jumlah" in query.lower() and "jumlah" in title:
-            ratio += 0.2
-        # BOOSTER: Jika query mengandung "persentase" dan judul juga
-        if "persentase" in query.lower() and "persentase" in title:
-            ratio += 0.2
-            
-        return ratio
+    # 3. SMART RERANKING
+    scored_candidates = []
+    for cand in potential_matches:
+        title = cand.get("title", "")
+        # Gunakan fungsi GLOBAL calculate_smart_score
+        smart_score = calculate_smart_score(query, title)
+        cand["_smart_score"] = smart_score
+        scored_candidates.append(cand)
 
-    # Urutkan berdasarkan skor kemiripan tertinggi
-    potential_matches.sort(key=calculate_similarity, reverse=True)
-    
-    # Log urutan ranking untuk debug
-    log.debug("--- RANKING CANDIDATES ---")
-    for i, p in enumerate(potential_matches[:3]):
-        score = calculate_similarity(p)
-        log.debug(f"Rank {i+1}: {p.get('title')} (Score: {score:.2f})")
+    # Urutkan Score Tertinggi
+    scored_candidates.sort(key=lambda x: x["_smart_score"], reverse=True)
 
-    # 4. PROSES PEMENANG (Top 1)
-    # Kita coba load file dari ranking 1. Jika gagal/kosong, coba ranking 2, dst.
-    
+    # Cek kualitas kandidat terbaik
+    if not scored_candidates or scored_candidates[0]["_smart_score"] < 0:
+        return {"status": "not_found"}
+
+    # ===============================================================
+    # PERBAIKAN UTAMA DI SINI:
+    # Jika tidak ada tahun (Query Umum), LANGSUNG return List Mode.
+    # Jangan mencoba load file satu per satu.
+    # ===============================================================
+    if not has_year:
+         options = []
+         list_text = "Saya menemukan beberapa dataset yang relevan:\n"
+         used_titles = set()
+         
+         # Hanya ambil yang skor positif (> 0)
+         valid_options = [c for c in scored_candidates if c["_smart_score"] > 0]
+         
+         if not valid_options:
+             return {"status": "not_found"}
+
+         for c in valid_options:
+             t = c.get("title", "").strip()
+             if t in used_titles: continue
+             used_titles.add(t)
+             
+             # Buat Value tombol
+             options.append({"label": t, "value": f"Tampilkan data {t}"})
+             list_text += f"\n* **{t}**"
+             
+             if len(options) >= 5: break
+         
+         return {
+             "status": "multiple_options", 
+             "response_text": list_text, 
+             "options": options
+         }
+
+    # 4. LOGIC KHUSUS (Jika User Minta Tahun Spesifik)
     final_result = None
     
-    # Cek maksimal 3 kandidat teratas
-    for match_cand in potential_matches[:3]:
+    for match_cand in scored_candidates[:3]:
+        # Skip jika skor minus
+        if match_cand["_smart_score"] < 0: continue
+
         title = match_cand.get("title")
         download_url = match_cand.get("download_url")
-        
-        log.info(f"Trying Candidate: {title}")
         
         df = load_full_dataframe_from_url(download_url)
         subset = find_relevant_rows(df, query)
@@ -637,35 +735,14 @@ def handle_dataset_search(query: str, show_preview: bool = False):
                 "subset": subset,
                 "df": df
             }
-            break # Ketemu data valid!
-        else:
-            log.warning(f"  -> File loaded but irrelevant rows for: {title}")
+            break 
 
-    # 5. RETURN RESPONSE
     if final_result:
         cand = final_result["candidate"]
         subset = final_result["subset"]
-        
-        # --- Logic List Mode (Jika query umum) ---
-        if not has_year:
-             # Kembalikan mode list (Code sama seperti sebelumnya)
-             # Gunakan potential_matches yang sudah di-sort
-             options = []
-             list_text = "Saya menemukan beberapa dataset yang relevan. Silakan pilih data spesifik yang Anda cari:\n"
-             used_titles = set()
-             for c in potential_matches:
-                 t = c.get("title", "").strip()
-                 if t in used_titles: continue
-                 used_titles.add(t)
-                 options.append({"label": t, "value": f"Tampilkan data {t}"})
-                 list_text += f"\n* **{t}**"
-                 if len(options) >= 5: break
-             
-             return {"status": "multiple_options", "response_text": list_text, "options": options}
-
-        # --- Logic Specific Mode ---
         title = cand.get("title")
         landing_page = cand.get("landing_page") or cand.get("download_url")
+        
         ai_analysis = analyze_data_with_llm(query, subset)
         
         preview_md = ""
@@ -686,21 +763,37 @@ def handle_dataset_search(query: str, show_preview: bool = False):
 # -------------------------
 # HANDLE GENERAL QUESTION (site guide)
 # -------------------------
-def handle_general_question(query: str) -> dict:
+def handle_general_question(query: str, context: str = "") -> dict:
     try:
-        # Gunakan LLM untuk menjawab langsung
-        prompt = (
-            "Anda adalah asisten AI 'Satu Data Garut'. Jawab pertanyaan berikut dengan singkat, ramah, "
-            "dan hanya berdasarkan informasi yang relevan jika tersedia. "
-            "Jika data resmi tidak ada, beri tahu pengguna secara wajar.\n\n"
-            f"PERTANYAAN: {query}\nJAWABAN:"
-        )
+        # Prompt diperbarui: Lebih cerdas membedakan konteks
+        prompt = f"""
+Anda adalah Asisten AI untuk Portal "Satu Data Garut".
+
+Tugas Anda adalah menjawab pertanyaan pengguna yang TIDAK ditemukan di database dataset statistik.
+
+Aturan Menjawab:
+1. **JIKA PERTANYAAN UMUM / PENGETAHUAN (General Knowledge):**
+   (Contoh: "Kabupaten Tasikmalaya", "Apa itu Stunting", "Resep Nasi Goreng", "Lokasi Garut")
+   - Jawablah secara LANGSUNG, informatif, dan membantu.
+   - **JANGAN** meminta maaf.
+   - **JANGAN** menyebutkan bahwa "dataset tidak ditemukan".
+   - Anggaplah Anda sedang mengobrol biasa.
+
+2. **JIKA PERTANYAAN MEMINTA DATA STATISTIK/ANGKA SPESIFIK:**
+   (Contoh: "Berapa jumlah penduduk Tasikmalaya 2024?", "Data inflasi bulan ini")
+   - Karena Anda tidak menemukan datanya di database internal, katakan dengan sopan bahwa "Data spesifik untuk ini belum tersedia di Satu Data Garut".
+   - Lalu berikan informasi umum atau saran untuk mengecek ke instansi terkait (misal BPS).
+
+Pertanyaan Pengguna: "{query}"
+
+Jawaban Anda:
+"""
         resp_text = run_gemini(prompt)
         return {"reply": resp_text}
     except Exception as e:
         log.exception("[GENERAL] error: %s", e)
-        return {"reply": "Maaf, terjadi masalah saat mencoba menjawab pertanyaan Anda."}
-
+        return {"reply": "Maaf, layanan AI sedang sibuk."}
+          
 # -------------------------
 # LIST SECTORS
 # -------------------------
@@ -765,13 +858,39 @@ def handle_sector_search(sector_name: str) -> dict:
 # -------------------------
 def classify_intent(processed_query: str, raw_query: str) -> str:
     raw_lower = raw_query.lower().strip()
-    if raw_lower == "apa saja dataset yang tersedia?":
-        return "list_sectors"
+    
+    # 1. PRIORITAS UTAMA: SECTOR SEARCH (Pencarian Spesifik per Sektor)
+    # WAJIB Ditaruh Paling Atas! 
+    # Agar tidak tertangkap oleh logic "list sectors" di bawahnya.
     if raw_lower.startswith("tampilkan dataset sektor"):
         return "dataset_sector_search"
-    general_keywords = ["siapa kamu", "apa itu", "bagaimana cara", "jelaskan", "apa yang dimaksud"]
+
+    # 2. CEK INTENT: LIST SECTORS (Daftar Sektor/Dinas)
+    # Menangkap: "list sektor", "daftar dinas", "apa saja sektornya", "opd apa saja"
+    sector_keywords = ["sektor", "dinas", "opd", "skpd", "penerbit", "publisher", "instansi"]
+    ask_keywords = ["apa saja", "list", "daftar", "tampilkan", "sebutkan", "tersedia", "ada", "lihat"]
+    
+    has_sector_keyword = any(k in raw_lower for k in sector_keywords)
+    has_ask_keyword = any(k in raw_lower for k in ask_keywords)
+    
+    # Trigger khusus tombol default
+    if raw_lower == "apa saja dataset yang tersedia?" or raw_lower == "apa saja dataset yang tersedia":
+        return "list_sectors"
+        
+    # Trigger fleksibel (misal: "tampilkan daftar sektor")
+    if has_sector_keyword and has_ask_keyword:
+        return "list_sectors"
+    
+    # Trigger kata tunggal
+    if raw_lower in ["sektor", "list sektor", "daftar sektor", "opd", "dinas"]:
+        return "list_sectors"
+
+    # 3. CEK INTENT: GENERAL QUESTION (Pertanyaan Umum)
+    general_keywords = ["siapa kamu", "apa itu", "bagaimana cara", "jelaskan", "apa yang dimaksud", "selamat", "halo", "hai", "pagi", "siang", "sore", "malam", "terima kasih"]
     if any(raw_lower.startswith(k) for k in general_keywords):
         return "general_question"
+        
+    # Default: Anggap sebagai pencarian data (Data Agent)
     return "run_data_agent"
 
 # -------------------------
@@ -829,15 +948,13 @@ def handle_chat():
                 log.exception("sector parse error: %s", e)
                 return jsonify({"reply": "Maaf, terjadi kesalahan saat memproses permintaan sektor Anda."}), 200
 
-        # ---- DATA AGENT ----
+# ---- DATA AGENT ----
         if intent == "run_data_agent":
-            # 1. Coba pecah query (misal: "penduduk miskin dan ipm")
             subs = decompose_query_with_llm(user_query)
             if not subs: subs = [user_query]
             
             final_responses = []
-            related_options = [] # Menampung opsi pilihan jika ada ambiguitas
-            
+            related_options = []
             found_any_data = False
 
             for s in subs:
@@ -851,24 +968,28 @@ def handle_chat():
                     final_responses.append(res["response_text"])
                     if "options" in res:
                         related_options.extend(res["options"])
-                # Jika "not_found", kita diamkan dulu, lanjut ke sub-query berikutnya
+                
+                # Jika status == "not_found", loop lanjut ke query berikutnya
             
-            # 2. Logic Gabungan
+            # 2. JIKA DATA DITEMUKAN -> Tampilkan Data
             if found_any_data:
                 combined_text = "\n\n---\n\n".join(final_responses)
-                
-                # Kembalikan response JSON
                 return jsonify({
                     "reply": combined_text, 
-                    "related_queries": related_options # Frontend akan render ini jadi tombol
+                    "related_queries": related_options 
                 }), 200
             
-            # 3. FALLBACK KE LLM (General Knowledge)
-            # Jika dataset search return "not_found" untuk semua sub-query
-            log.info("[FALLBACK] Data tidak ditemukan, beralih ke General Knowledge.")
-            fallback_res = handle_general_question(user_query)
+            # 3. JIKA TIDAK ADA DATA SAMA SEKALI -> FALLBACK KE LLM
+            # Ini yang menjawab request "Jawaban bukan mencari data terdekat, tapi jawaban LLM"
+            
+            log.info("[FALLBACK] Dataset strict filter rejected all candidates. Asking LLM General Knowledge.")
+            
+            fallback_out = handle_general_question(user_query)
+            llm_reply = fallback_out.get("reply", "")
+            
             return jsonify({
-                "reply": f"**Data spesifik tidak ditemukan di database.**\n\nNamun, berdasarkan pengetahuan umum:\n{fallback_res['reply']}"
+                "reply": llm_reply, # Langsung kirim jawaban LLM yang sopan tadi
+                "results": []
             }), 200
 
         # ... (Fallback global)
